@@ -1,0 +1,30 @@
+{
+  "name": "jev-shield",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prompt-injection checks that ask TypeSafe Jev for probabilities and apply a deterministic policy.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "jev-shield": "./dist/src/cli.js"
+  },
+  "exports": {
+    ".": "./dist/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc && node --test dist/test/*.test.js",
+    "start": "node dist/src/cli.js serve",
+    "jev-shield": "node dist/src/cli.js"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "typescript": "^7.0.2"
+  }
+}

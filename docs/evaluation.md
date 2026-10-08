@@ -16,7 +16,7 @@ Per-tag rates use the same rule inside each tag. Encoded and multilingual tags a
 
 ## Other numbers in the report
 
-- `source_blind` scores the same rows with the question that ignores `source` and `trust`.
+- `source_blind` scores the same rows with the question that ignores `source`, `trust`, and `context`.
 - `category_union` flags a row when any attack-category probability crosses the suspicious threshold, including rows the primary score would pass.
 - `detection_threshold_sweep` shows precision, recall, and false-positive rate from 0.05 to 0.95.
 - Latency is the nearest-rank p50 and p95 of live Shield calls. Eval calls are sequential.
@@ -32,6 +32,10 @@ Rows that throw are listed under `errors` and stay out of the confusion matrix. 
 
 `jev-shield eval-public --file set.jsonl` scores an external file whose labels are `safe`/`benign`/`0` or `malicious`/`attack`/`injection`/`1`. That report is separate. Public labels are not merged into the hand-labeled matrix, because some public sets mark ordinary tasks as attacks.
 
+## Gandalf
+
+`jev-shield gandalf` scores the published Gandalf solutions in `corpus/gandalf.jsonl` before a defender call. Each call sets `source` to `user` and fills `context` with the guarded-password situation plus earlier user turns from the same session. The password value is not sent. A turn is rejected when the verdict is not safe. The command prints a report and writes JSON under `eval/results/`. It does not call a defender model.
+
 ## Live runs
 
-`TYPESAFE_API_KEY` is required for a live eval. With no key and no `--fixture` file, the command exits 2 and writes nothing. Do not fill `eval/results/` with guessed scores.
+`TYPESAFE_API_KEY` is required for a live eval. With no key and no `--fixture` file, the command exits 2 and writes nothing. Do not fill `eval/results/` with guessed scores. The Gandalf command uses the same rule.

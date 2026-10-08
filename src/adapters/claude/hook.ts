@@ -8,7 +8,7 @@ import { parseClaudeHookInput } from "./parse.js";
 
 export interface ClaudeHookResult {
   exitCode: 0;
-  body: ClaudeHookOutput;
+  body: ClaudeHookOutput | Record<string, never>;
 }
 
 function denied(reason: string): ClaudeHookResult {
@@ -28,6 +28,15 @@ export async function handleClaudeHook(
     raw = JSON.parse(stdin);
   } catch {
     return denied("Hook input was not valid JSON. Blocked before execution.");
+  }
+  if (
+    raw !== null &&
+    typeof raw === "object" &&
+    !Array.isArray(raw) &&
+    "hook_event_name" in raw &&
+    (raw as { hook_event_name?: unknown }).hook_event_name !== "PreToolUse"
+  ) {
+    return { exitCode: 0, body: {} };
   }
   try {
     const action = parseClaudeHookInput(raw);

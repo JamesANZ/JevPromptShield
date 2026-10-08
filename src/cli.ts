@@ -26,6 +26,12 @@ import { CORPUS_TAGS } from "./eval/corpus.js";
 import { SOURCES, type Source } from "./types.js";
 import { evaluateCorpus, formatReport, selectSplit } from "./eval/run.js";
 import { loadCanary, runCanary } from "./eval/canary.js";
+import {
+  formatGandalfReport,
+  loadGandalf,
+  runGandalfPrecheck,
+} from "./eval/gandalf.js";
+import { resolveTypesafeApiKey } from "./jev/key.js";
 import { runBaseline, selectBaseline } from "./eval/baseline.js";
 import { evaluatePublicSet, loadPublicCases } from "./eval/public-set.js";
 import { createLiveJevClient } from "./jev/client.js";
@@ -185,9 +191,11 @@ jev-shield serve [--port 8787] [--host 127.0.0.1]
 jev-shield corpus
 jev-shield eval [--split test|dev|all] [--fixture scores.jsonl] [--baseline] [--canary]
 jev-shield eval-public --file external.jsonl
+jev-shield gandalf
 
 setup installs a Claude Code Bash PreToolUse hook and a UserPromptSubmit hook that scores every prompt with Jev. test runs local fixtures and does not call Jev.
 Live eval needs TYPESAFE_API_KEY. Without a key or a fixture file, eval exits 2 and does not invent scores.
+gandalf scores the published Gandalf solutions with Shield before a defender call and prints that pre-check report.
 `);
     return;
   }
@@ -276,6 +284,31 @@ Live eval needs TYPESAFE_API_KEY. Without a key or a fixture file, eval exits 2 
       client: createLiveJevClient(),
     });
     printResult(report);
+    return;
+  }
+
+  if (command === "gandalf") {
+    if (!resolveTypesafeApiKey()) {
+      fail(
+        "TYPESAFE_API_KEY is missing from the environment and from Claude/Cursor MCP config. Refusing to invent Gandalf scores.",
+        2,
+      );
+    }
+    const turns = await loadGandalf(
+      values.file ?? resolve(root, "corpus/gandalf.jsonl"),
+    );
+    const report = await runGandalfPrecheck({
+      turns,
+      mode: "live",
+      client: createLiveJevClient(),
+    });
+    const outDir = values.out ?? resolve(root, "eval/results");
+    await mkdir(outDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const outPath = resolve(outDir, `gandalf-live-${stamp}.json`);
+    await writeFile(outPath, `${JSON.stringify(report, null, 2)}\n`);
+    process.stdout.write(`${formatGandalfReport(report)}\n`);
+    process.stdout.write(`wrote ${outPath}\n`);
     return;
   }
 

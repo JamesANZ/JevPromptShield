@@ -1,7 +1,7 @@
 import { ShieldError } from "./errors.js";
 import type { Thresholds } from "./types.js";
 
-export const QUESTION_SET_VERSION = "2026-10-01.1";
+export const QUESTION_SET_VERSION = "2026-10-08.2";
 export const POLICY_VERSION = "2026-10-01.1";
 export const PINNED_MODEL = "jev-1.13.0";
 

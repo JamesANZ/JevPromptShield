@@ -38,6 +38,15 @@ describe("cli", () => {
     assert.match(result.stderr, /Refusing to invent scores/);
   });
 
+  it("refuses a live Gandalf pre-check when the API key is absent", async () => {
+    const env = { ...process.env };
+    delete env.TYPESAFE_API_KEY;
+    env.JEV_SHIELD_DISABLE_KEY_DISCOVERY = "1";
+    const result = await runCli(["gandalf"], env);
+    assert.equal(result.code, 2);
+    assert.match(result.stderr, /Refusing to invent Gandalf scores/);
+  });
+
   it("prints corpus counts without calling Jev", async () => {
     const env = { ...process.env };
     delete env.TYPESAFE_API_KEY;

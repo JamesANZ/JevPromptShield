@@ -44,7 +44,7 @@ describe("analyze", () => {
     assert.ok(result.categories.includes("data_exfiltration"));
     assert.equal(typeof result.reason, "string");
     assert.ok(result.latency_ms >= 0);
-    assert.equal(result.question_set_version, "2026-10-01.1");
+    assert.equal(result.question_set_version, "2026-10-08.2");
   });
 
   it("does not turn a Jev failure into a safe result", async () => {

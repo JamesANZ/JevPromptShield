@@ -49,7 +49,7 @@ describe("http", () => {
       assert.ok(Array.isArray(body.categories));
       assert.equal(typeof body.reason, "string");
       assert.equal(typeof body.latency_ms, "number");
-      assert.equal(body.question_set_version, "2026-10-01.1");
+      assert.equal(body.question_set_version, "2026-10-08.2");
     } finally {
       server.closeAllConnections();
       server.close();

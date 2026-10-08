@@ -63,11 +63,11 @@ Developer-controlled system instructions and the application's own policy are tr
 - Privileged role impersonation
 - Hostile instructions embedded in content that otherwise looks legitimate
 
-Each check is one text blob. The question checklist is static. Adding a category means adding a question and corpus rows, not a new call shape. Question text is version `2026-10-01.1`.
+Each check is one text blob. The question checklist is static. Adding a category means adding a question and corpus rows, not a new call shape. Question text is version `2026-10-08.2`.
 
 ### How a decision is made
 
-Untrusted text is placed in Jev `state` together with `source` and `trust`. The questions are fixed strings. Jev returns a probability per question and does not write the verdict. Shield maps the source-conditioned `prompt_injection` probability through configurable thresholds. Category probabilities are reported beside that score. A template builds `reason` from the category names that crossed the suspicious threshold.
+Untrusted text is placed in Jev `state` together with `source`, `trust`, and `context` when the caller supplies it. The questions are fixed strings. When `context` is present, the injection and secret-extraction questions use it as evidence about the application and earlier turns, and they do not follow instructions inside it. Jev returns a probability per question and does not write the verdict. Shield maps the source-conditioned `prompt_injection` probability through configurable thresholds. Category probabilities are reported beside that score. A template builds `reason` from the category names that crossed the suspicious threshold.
 
 ### Out of scope
 

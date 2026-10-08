@@ -21,7 +21,11 @@ export const RISKS = ["low", "medium", "high"] as const;
 
 export type Risk = (typeof RISKS)[number];
 
-export const CONTENT_ROLES = ["data", "user_task", "model_instruction"] as const;
+export const CONTENT_ROLES = [
+  "data",
+  "user_task",
+  "model_instruction",
+] as const;
 
 export type ContentRole = (typeof CONTENT_ROLES)[number];
 

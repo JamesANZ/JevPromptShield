@@ -24,7 +24,11 @@ export class ShieldError extends Error {
   readonly code: ShieldErrorCode;
   readonly status: number;
 
-  constructor(code: ShieldErrorCode, message: string, options?: { cause?: unknown }) {
+  constructor(
+    code: ShieldErrorCode,
+    message: string,
+    options?: { cause?: unknown },
+  ) {
     super(message, options);
     this.name = "ShieldError";
     this.code = code;

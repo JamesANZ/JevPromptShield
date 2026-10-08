@@ -1,7 +1,15 @@
 import { POLICY_VERSION, estimateJevCostUsd } from "../config.js";
 import { ShieldError } from "../errors.js";
 import { QUESTION_SET_VERSION } from "../engine/questions.js";
-import type { AnalyzeResult, Category, ContentRole, Risk, Signal, Thresholds, Verdict } from "../types.js";
+import type {
+  AnalyzeResult,
+  Category,
+  ContentRole,
+  Risk,
+  Signal,
+  Thresholds,
+  Verdict,
+} from "../types.js";
 import { CATEGORIES, CONTENT_ROLES } from "../types.js";
 
 export { POLICY_VERSION };
@@ -19,7 +27,8 @@ export interface JevDecision {
 }
 
 const REASONS: Record<Category, string> = {
-  prompt_injection: "manipulate the consuming model with an injected instruction",
+  prompt_injection:
+    "manipulate the consuming model with an injected instruction",
   instruction_override: "override trusted instructions",
   system_prompt_extraction: "extract the system prompt",
   secret_extraction: "extract credentials or secrets",
@@ -27,7 +36,8 @@ const REASONS: Record<Category, string> = {
   malicious_tool_use: "invoke tools outside the original task",
   role_impersonation: "impersonate a privileged role",
   obfuscated_instruction: "hide instructions through encoding or obfuscation",
-  embedded_instruction: "embed model-directed instructions inside otherwise ordinary content",
+  embedded_instruction:
+    "embed model-directed instructions inside otherwise ordinary content",
 };
 
 function joinAnd(items: string[]): string {
@@ -37,19 +47,27 @@ function joinAnd(items: string[]): string {
 }
 
 export function buildReason(verdict: Verdict, categories: Category[]): string {
-  if (verdict === "safe") return "No attack signal crossed the suspicious threshold.";
+  if (verdict === "safe")
+    return "No attack signal crossed the suspicious threshold.";
   const phrases = categories.map((category) => REASONS[category]);
-  if (phrases.length === 0) return "The primary prompt-injection score crossed the threshold.";
+  if (phrases.length === 0)
+    return "The primary prompt-injection score crossed the threshold.";
   return `Content attempts to ${joinAnd(phrases)}.`;
 }
 
 function assertScore(name: string, value: number): void {
   if (!Number.isFinite(value) || value < 0 || value > 1) {
-    throw new ShieldError("jev_error", `Jev returned an unusable score for ${name}.`);
+    throw new ShieldError(
+      "jev_error",
+      `Jev returned an unusable score for ${name}.`,
+    );
   }
 }
 
-export function applyPolicy(decision: JevDecision, thresholds: Thresholds): Omit<AnalyzeResult, "latency_ms"> {
+export function applyPolicy(
+  decision: JevDecision,
+  thresholds: Thresholds,
+): Omit<AnalyzeResult, "latency_ms"> {
   if (!CONTENT_ROLES.includes(decision.content_role)) {
     throw new ShieldError("jev_error", "Jev returned an unknown content role.");
   }
@@ -94,7 +112,9 @@ export function applyPolicy(decision: JevDecision, thresholds: Thresholds): Omit
   };
 
   const categories =
-    verdict === "safe" ? [] : CATEGORIES.filter((category) => signals[category]?.triggered === true);
+    verdict === "safe"
+      ? []
+      : CATEGORIES.filter((category) => signals[category]?.triggered === true);
 
   return {
     safe: verdict === "safe",

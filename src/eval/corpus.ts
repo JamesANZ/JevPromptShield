@@ -1,6 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { ShieldError } from "../errors.js";
-import { CATEGORIES, SOURCES, VERDICTS, type Category, type Source, type Verdict } from "../types.js";
+import {
+  CATEGORIES,
+  SOURCES,
+  VERDICTS,
+  type Category,
+  type Source,
+  type Verdict,
+} from "../types.js";
 
 export const CORPUS_TAGS = [
   "benign_data",
@@ -35,41 +42,88 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function parseCorpusCase(raw: unknown, line: number): CorpusCase {
-  if (!isRecord(raw)) throw new ShieldError("invalid_request", `Corpus line ${line} is not an object.`);
+  if (!isRecord(raw))
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus line ${line} is not an object.`,
+    );
   if (typeof raw.id !== "string" || raw.id.trim() === "") {
-    throw new ShieldError("invalid_request", `Corpus line ${line} is missing id.`);
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus line ${line} is missing id.`,
+    );
   }
   if (typeof raw.content !== "string" || raw.content.trim() === "") {
-    throw new ShieldError("invalid_request", `Corpus case ${raw.id} has empty content.`);
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus case ${raw.id} has empty content.`,
+    );
   }
-  if (typeof raw.source !== "string" || !SOURCES.includes(raw.source as Source)) {
-    throw new ShieldError("invalid_request", `Corpus case ${raw.id} has an unknown source.`);
+  if (
+    typeof raw.source !== "string" ||
+    !SOURCES.includes(raw.source as Source)
+  ) {
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus case ${raw.id} has an unknown source.`,
+    );
   }
   if (!isRecord(raw.expected)) {
-    throw new ShieldError("invalid_request", `Corpus case ${raw.id} is missing expected.`);
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus case ${raw.id} is missing expected.`,
+    );
   }
   const verdict = raw.expected.verdict;
   if (typeof verdict !== "string" || !VERDICTS.includes(verdict as Verdict)) {
-    throw new ShieldError("invalid_request", `Corpus case ${raw.id} has an unknown verdict.`);
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus case ${raw.id} has an unknown verdict.`,
+    );
   }
-  if (!Array.isArray(raw.expected.categories) || !raw.expected.categories.every((item) => typeof item === "string")) {
-    throw new ShieldError("invalid_request", `Corpus case ${raw.id} has invalid categories.`);
+  if (
+    !Array.isArray(raw.expected.categories) ||
+    !raw.expected.categories.every((item) => typeof item === "string")
+  ) {
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus case ${raw.id} has invalid categories.`,
+    );
   }
   const categories = raw.expected.categories as string[];
   if (categories.some((item) => !CATEGORIES.includes(item as Category))) {
-    throw new ShieldError("invalid_request", `Corpus case ${raw.id} has an unknown category.`);
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus case ${raw.id} has an unknown category.`,
+    );
   }
   if (verdict === "safe" && categories.length > 0) {
-    throw new ShieldError("invalid_request", `Corpus case ${raw.id} is safe and also lists categories.`);
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus case ${raw.id} is safe and also lists categories.`,
+    );
   }
   if (verdict !== "safe" && categories.length === 0) {
-    throw new ShieldError("invalid_request", `Corpus case ${raw.id} is ${verdict} and lists no categories.`);
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus case ${raw.id} is ${verdict} and lists no categories.`,
+    );
   }
-  if (!Array.isArray(raw.tags) || raw.tags.length === 0 || raw.tags.some((tag) => typeof tag !== "string")) {
-    throw new ShieldError("invalid_request", `Corpus case ${raw.id} needs at least one tag.`);
+  if (
+    !Array.isArray(raw.tags) ||
+    raw.tags.length === 0 ||
+    raw.tags.some((tag) => typeof tag !== "string")
+  ) {
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus case ${raw.id} needs at least one tag.`,
+    );
   }
   if (raw.tags.some((tag) => !CORPUS_TAGS.includes(tag as CorpusTag))) {
-    throw new ShieldError("invalid_request", `Corpus case ${raw.id} has an unknown tag.`);
+    throw new ShieldError(
+      "invalid_request",
+      `Corpus case ${raw.id} has an unknown tag.`,
+    );
   }
   const parsed: CorpusCase = {
     id: raw.id,
@@ -98,10 +152,17 @@ export function parseCorpus(text: string): CorpusCase[] {
     try {
       raw = JSON.parse(line) as unknown;
     } catch {
-      throw new ShieldError("invalid_request", `Corpus line ${lineNumber} is not valid JSON.`);
+      throw new ShieldError(
+        "invalid_request",
+        `Corpus line ${lineNumber} is not valid JSON.`,
+      );
     }
     const item = parseCorpusCase(raw, lineNumber);
-    if (seen.has(item.id)) throw new ShieldError("invalid_request", `Duplicate corpus id ${item.id}.`);
+    if (seen.has(item.id))
+      throw new ShieldError(
+        "invalid_request",
+        `Duplicate corpus id ${item.id}.`,
+      );
     seen.add(item.id);
     cases.push(item);
   }

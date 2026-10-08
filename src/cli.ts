@@ -1,8 +1,23 @@
 #!/usr/bin/env node
 import { mkdir, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
+import {
+  commandVersion,
+  formatDoctor,
+  runDoctor,
+} from "./adapters/claude/doctor.js";
+import { handleClaudeHook } from "./adapters/claude/hook.js";
+import { handlePromptSubmit } from "./adapters/claude/prompt.js";
+import {
+  claudeHookCommand,
+  claudePromptHookCommand,
+  installClaudeHook,
+  installPromptHook,
+} from "./adapters/claude/install.js";
+import { runSelfCheck } from "./enforcement/self-check.js";
 import { analyze } from "./analyze.js";
 import { createServer } from "./api/server.js";
 import { isShieldError } from "./errors.js";
@@ -58,22 +73,120 @@ async function loadFixtures(path: string): Promise<Map<string, JevDecision>> {
   for (const line of text.split(/\r?\n/)) {
     if (line.trim() === "") continue;
     const raw = JSON.parse(line) as { id?: string; decision?: JevDecision };
-    if (!raw.id || !raw.decision) throw new Error("Each fixture line needs id and decision.");
+    if (!raw.id || !raw.decision)
+      throw new Error("Each fixture line needs id and decision.");
     fixtures.set(raw.id, raw.decision);
   }
   return fixtures;
 }
 
+function gateSettingsPath(values: {
+  project?: boolean;
+  settings?: string;
+}): string {
+  if (values.settings) return resolve(values.settings);
+  if (values.project) return resolve(process.cwd(), ".claude", "settings.json");
+  return join(homedir(), ".claude", "settings.json");
+}
+
+async function runGateCommand(command: string): Promise<void> {
+  if (command === "test") {
+    if (process.argv.length > 3) fail("jev-shield test takes no arguments.");
+    const report = await runSelfCheck();
+    printResult(report);
+    if (!report.ok) fail("Self-check failed.", 1);
+    return;
+  }
+
+  if (command === "hook") {
+    const which = process.argv[3];
+    if (which !== "claude" && which !== "prompt") {
+      fail("Usage: jev-shield hook claude|prompt");
+    }
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+    }
+    const stdin = Buffer.concat(chunks).toString("utf8");
+    const result =
+      which === "claude"
+        ? await handleClaudeHook(stdin)
+        : await handlePromptSubmit(stdin);
+    process.stdout.write(`${JSON.stringify(result.body)}\n`);
+    return;
+  }
+
+  const { values } = parseArgs({
+    args: process.argv.slice(command === "setup" ? 4 : 3),
+    options: {
+      project: { type: "boolean", default: false },
+      settings: { type: "string" },
+    },
+    strict: true,
+  });
+  const settingsPath = gateSettingsPath(values);
+
+  if (command === "setup") {
+    if (process.argv[3] !== "claude") {
+      fail(
+        "Claude Code is the installable adapter in this version. Cursor and Codex are described in docs/agents.md.",
+      );
+    }
+    const cliPath = fileURLToPath(import.meta.url);
+    const bash = await installClaudeHook(
+      settingsPath,
+      claudeHookCommand(process.execPath, cliPath),
+    );
+    const prompt = await installPromptHook(
+      settingsPath,
+      claudePromptHookCommand(process.execPath, cliPath),
+    );
+    process.stdout.write(
+      `${bash.changed || prompt.changed ? "Installed" : "Already installed"} Claude Code hooks in ${settingsPath}\n`,
+    );
+    return;
+  }
+
+  if (command === "doctor") {
+    const report = await runDoctor({
+      settingsPath,
+      cliPath: fileURLToPath(import.meta.url),
+      claudeVersion: await commandVersion("claude"),
+    });
+    process.stdout.write(formatDoctor(report.checks));
+    if (!report.ok) fail("Doctor found a problem.", 1);
+    return;
+  }
+
+  fail(`Unknown command ${command}. Run jev-shield help.`);
+}
+
 async function main(): Promise<void> {
-  const { command, values } = await readFlags();
+  const command = process.argv[2] ?? "help";
+  if (
+    command === "setup" ||
+    command === "doctor" ||
+    command === "test" ||
+    command === "hook"
+  ) {
+    await runGateCommand(command);
+    return;
+  }
+  const { values } = await readFlags();
   if (command === "help" || command === "--help" || command === "-h") {
-    process.stdout.write(`jev-shield analyze --source webpage --file page.txt
+    process.stdout.write(`jev-shield setup claude [--project] [--settings path]
+jev-shield doctor [--project] [--settings path]
+jev-shield test
+jev-shield hook claude
+jev-shield hook prompt
+jev-shield analyze --source webpage --file page.txt
 jev-shield analyze --source user --content "text"
 jev-shield serve [--port 8787] [--host 127.0.0.1]
 jev-shield corpus
 jev-shield eval [--split test|dev|all] [--fixture scores.jsonl] [--baseline] [--canary]
 jev-shield eval-public --file external.jsonl
 
+setup installs a Claude Code Bash PreToolUse hook and a UserPromptSubmit hook that scores every prompt with Jev. test runs local fixtures and does not call Jev.
 Live eval needs TYPESAFE_API_KEY. Without a key or a fixture file, eval exits 2 and does not invent scores.
 `);
     return;
@@ -97,7 +210,9 @@ Live eval needs TYPESAFE_API_KEY. Without a key or a fixture file, eval exits 2 
     }
     if (!content) fail("Pass --content or --file.");
     if (!values.source || !SOURCES.includes(values.source as Source)) {
-      fail("Pass --source (user, webpage, pdf, email, rag, tool, mcp, agent, database, unknown).");
+      fail(
+        "Pass --source (user, webpage, pdf, email, rag, tool, mcp, agent, database, unknown).",
+      );
     }
     const source = values.source as Source;
     try {
@@ -108,23 +223,38 @@ Live eval needs TYPESAFE_API_KEY. Without a key or a fixture file, eval exits 2 
       });
       printResult(result);
     } catch (error) {
-      if (isShieldError(error)) fail(JSON.stringify({ error: { code: error.code, message: error.message } }));
+      if (isShieldError(error))
+        fail(
+          JSON.stringify({
+            error: { code: error.code, message: error.message },
+          }),
+        );
       throw error;
     }
     return;
   }
 
   if (command === "corpus") {
-    const cases = await loadCorpus(values.corpus ?? resolve(root, "corpus/cases.jsonl"));
-    const byTag = Object.fromEntries(CORPUS_TAGS.map((tag) => [tag, cases.filter((item) => item.tags.includes(tag)).length]));
+    const cases = await loadCorpus(
+      values.corpus ?? resolve(root, "corpus/cases.jsonl"),
+    );
+    const byTag = Object.fromEntries(
+      CORPUS_TAGS.map((tag) => [
+        tag,
+        cases.filter((item) => item.tags.includes(tag)).length,
+      ]),
+    );
     printResult({
       n: cases.length,
       dev: cases.filter((item) => splitForId(item.id) === "dev").length,
       test: cases.filter((item) => splitForId(item.id) === "test").length,
       by_verdict: {
         safe: cases.filter((item) => item.expected.verdict === "safe").length,
-        suspicious: cases.filter((item) => item.expected.verdict === "suspicious").length,
-        malicious: cases.filter((item) => item.expected.verdict === "malicious").length,
+        suspicious: cases.filter(
+          (item) => item.expected.verdict === "suspicious",
+        ).length,
+        malicious: cases.filter((item) => item.expected.verdict === "malicious")
+          .length,
       },
       by_tag: byTag,
     });
@@ -132,32 +262,47 @@ Live eval needs TYPESAFE_API_KEY. Without a key or a fixture file, eval exits 2 
   }
 
   if (command === "eval-public") {
-    if (!values.file) fail("Pass --file pointing at a JSONL set with text and label.");
+    if (!values.file)
+      fail("Pass --file pointing at a JSONL set with text and label.");
     if (!process.env.TYPESAFE_API_KEY?.trim()) {
-      fail("TYPESAFE_API_KEY is missing. Refusing to invent public-set scores.", 2);
+      fail(
+        "TYPESAFE_API_KEY is missing. Refusing to invent public-set scores.",
+        2,
+      );
     }
     const cases = await loadPublicCases(values.file);
-    const report = await evaluatePublicSet({ cases, client: createLiveJevClient() });
+    const report = await evaluatePublicSet({
+      cases,
+      client: createLiveJevClient(),
+    });
     printResult(report);
     return;
   }
 
   if (command === "eval") {
     const split = values.split;
-    if (split !== "dev" && split !== "test" && split !== "all") fail("--split must be dev, test, or all.");
-    const cases = await loadCorpus(values.corpus ?? resolve(root, "corpus/cases.jsonl"));
+    if (split !== "dev" && split !== "test" && split !== "all")
+      fail("--split must be dev, test, or all.");
+    const cases = await loadCorpus(
+      values.corpus ?? resolve(root, "corpus/cases.jsonl"),
+    );
     const selected = selectSplit(cases, split);
     const fixturePath = values.fixture;
     const hasKey = Boolean(process.env.TYPESAFE_API_KEY?.trim());
     if (!fixturePath && !hasKey) {
-      fail("TYPESAFE_API_KEY is missing and no --fixture file was given. Refusing to invent scores.", 2);
+      fail(
+        "TYPESAFE_API_KEY is missing and no --fixture file was given. Refusing to invent scores.",
+        2,
+      );
     }
     const mode = fixturePath ? "fixture" : "live";
     const report = await evaluateCorpus({
       cases,
       mode,
       split,
-      ...(fixturePath ? { fixtures: await loadFixtures(fixturePath) } : { client: createLiveJevClient() }),
+      ...(fixturePath
+        ? { fixtures: await loadFixtures(fixturePath) }
+        : { client: createLiveJevClient() }),
     });
     const output: {
       shield: typeof report;
@@ -167,7 +312,10 @@ Live eval needs TYPESAFE_API_KEY. Without a key or a fixture file, eval exits 2 
     if (values.baseline) {
       const model = selectBaseline();
       if (!model) {
-        output.baseline = { skipped: "Set OPENAI_API_KEY or ANTHROPIC_API_KEY to run the cheap LLM judge." };
+        output.baseline = {
+          skipped:
+            "Set OPENAI_API_KEY or ANTHROPIC_API_KEY to run the cheap LLM judge.",
+        };
       } else {
         output.baseline = await runBaseline({
           model,
@@ -184,10 +332,14 @@ Live eval needs TYPESAFE_API_KEY. Without a key or a fixture file, eval exits 2 
     if (values.canary) {
       const model = selectBaseline();
       if (!model) {
-        output.canary = { skipped: "Set OPENAI_API_KEY or ANTHROPIC_API_KEY to run the canary harness." };
+        output.canary = {
+          skipped:
+            "Set OPENAI_API_KEY or ANTHROPIC_API_KEY to run the canary harness.",
+        };
       } else if (!hasKey) {
         output.canary = {
-          skipped: "Canary protection needs TYPESAFE_API_KEY. Fixture files cover the labeled corpus, not the canary rows.",
+          skipped:
+            "Canary protection needs TYPESAFE_API_KEY. Fixture files cover the labeled corpus, not the canary rows.",
         };
       } else {
         output.canary = await runCanary({
@@ -203,8 +355,16 @@ Live eval needs TYPESAFE_API_KEY. Without a key or a fixture file, eval exits 2 
     const outPath = resolve(outDir, `${split}-${mode}-${stamp}.json`);
     await writeFile(outPath, `${JSON.stringify(output, null, 2)}\n`);
     process.stdout.write(`${formatReport(report)}\n`);
-    if (output.baseline && typeof output.baseline === "object" && "binary" in output.baseline) {
-      const baseline = output.baseline as { model: string; binary: { recall: number | null; false_positive_rate: number | null }; cost_per_1000_usd: number | null };
+    if (
+      output.baseline &&
+      typeof output.baseline === "object" &&
+      "binary" in output.baseline
+    ) {
+      const baseline = output.baseline as {
+        model: string;
+        binary: { recall: number | null; false_positive_rate: number | null };
+        cost_per_1000_usd: number | null;
+      };
       process.stdout.write(
         `baseline ${baseline.model}: recall ${baseline.binary.recall ?? "n/a"} fpr ${baseline.binary.false_positive_rate ?? "n/a"} cost/1000 ${baseline.cost_per_1000_usd ?? "n/a"}\n`,
       );
@@ -217,7 +377,10 @@ Live eval needs TYPESAFE_API_KEY. Without a key or a fixture file, eval exits 2 
 }
 
 main().catch((error: unknown) => {
-  if (isShieldError(error)) fail(JSON.stringify({ error: { code: error.code, message: error.message } }));
+  if (isShieldError(error))
+    fail(
+      JSON.stringify({ error: { code: error.code, message: error.message } }),
+    );
   const message = error instanceof Error ? error.message : "JEV Shield failed.";
   fail(message);
 });

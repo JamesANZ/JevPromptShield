@@ -25,11 +25,17 @@ export function estimateJevCostUsd(inputTokens: number): number {
   return (inputTokens / 1_000_000) * JEV_INPUT_USD_PER_MILLION;
 }
 
-function readUnitInterval(name: string, raw: string | undefined): number | undefined {
+function readUnitInterval(
+  name: string,
+  raw: string | undefined,
+): number | undefined {
   if (raw === undefined || raw.trim() === "") return undefined;
   const value = Number(raw);
   if (!Number.isFinite(value) || value < 0 || value > 1) {
-    throw new ShieldError("invalid_request", `${name} must be a number from 0 to 1.`);
+    throw new ShieldError(
+      "invalid_request",
+      `${name} must be a number from 0 to 1.`,
+    );
   }
   return value;
 }
@@ -40,11 +46,17 @@ export function assertThresholds(thresholds: Thresholds): void {
     ["malicious", thresholds.malicious],
   ] as const) {
     if (!Number.isFinite(value) || value < 0 || value > 1) {
-      throw new ShieldError("invalid_request", `${name} threshold must be a number from 0 to 1.`);
+      throw new ShieldError(
+        "invalid_request",
+        `${name} threshold must be a number from 0 to 1.`,
+      );
     }
   }
   if (thresholds.suspicious >= thresholds.malicious) {
-    throw new ShieldError("invalid_request", "suspicious threshold must be below the malicious threshold.");
+    throw new ShieldError(
+      "invalid_request",
+      "suspicious threshold must be below the malicious threshold.",
+    );
   }
 }
 
@@ -54,11 +66,17 @@ export function resolveThresholds(
 ): Thresholds {
   const suspicious =
     override?.suspicious ??
-    readUnitInterval("JEV_SHIELD_SUSPICIOUS_THRESHOLD", env.JEV_SHIELD_SUSPICIOUS_THRESHOLD) ??
+    readUnitInterval(
+      "JEV_SHIELD_SUSPICIOUS_THRESHOLD",
+      env.JEV_SHIELD_SUSPICIOUS_THRESHOLD,
+    ) ??
     DEFAULT_THRESHOLDS.suspicious;
   const malicious =
     override?.malicious ??
-    readUnitInterval("JEV_SHIELD_MALICIOUS_THRESHOLD", env.JEV_SHIELD_MALICIOUS_THRESHOLD) ??
+    readUnitInterval(
+      "JEV_SHIELD_MALICIOUS_THRESHOLD",
+      env.JEV_SHIELD_MALICIOUS_THRESHOLD,
+    ) ??
     DEFAULT_THRESHOLDS.malicious;
   const thresholds = { suspicious, malicious };
   assertThresholds(thresholds);

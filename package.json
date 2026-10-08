@@ -2,7 +2,7 @@
   "name": "jev-shield",
   "version": "0.1.0",
   "private": true,
-  "description": "Prompt-injection checks that ask TypeSafe Jev for probabilities and apply a deterministic policy.",
+  "description": "Checks actions proposed by AI coding agents before they reach privileged tools, and scores untrusted text for prompt injection with TypeSafe Jev.",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "tsc && node --test dist/test/*.test.js",
+    "test": "tsc && find dist/test -name '*.test.js' -exec node --test {} +",
     "start": "node dist/src/cli.js serve",
     "jev-shield": "node dist/src/cli.js"
   },

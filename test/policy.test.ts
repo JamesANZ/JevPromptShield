@@ -24,7 +24,11 @@ describe("policy", () => {
   it("uses the suspicious band at the threshold and includes triggered categories", () => {
     const result = applyPolicy(
       decisionFromScores(
-        { prompt_injection: 0.4, instruction_override: 0.4, data_exfiltration: 0.39 },
+        {
+          prompt_injection: 0.4,
+          instruction_override: 0.4,
+          data_exfiltration: 0.39,
+        },
         { content_role: "model_instruction", content_role_probability: 0.8 },
       ),
       thresholds,
@@ -32,13 +36,19 @@ describe("policy", () => {
     assert.equal(result.safe, false);
     assert.equal(result.verdict, "suspicious");
     assert.equal(result.risk, "medium");
-    assert.deepEqual(result.categories, ["prompt_injection", "instruction_override"]);
+    assert.deepEqual(result.categories, [
+      "prompt_injection",
+      "instruction_override",
+    ]);
     assert.match(result.reason, /override trusted instructions/);
     assert.equal(result.content_role, "model_instruction");
   });
 
   it("marks the malicious threshold as high risk", () => {
-    const result = applyPolicy(decisionFromScores({ prompt_injection: 0.75 }), thresholds);
+    const result = applyPolicy(
+      decisionFromScores({ prompt_injection: 0.75 }),
+      thresholds,
+    );
     assert.equal(result.verdict, "malicious");
     assert.equal(result.risk, "high");
     assert.equal(result.safe, false);
@@ -48,7 +58,8 @@ describe("policy", () => {
   it("rejects a suspicious threshold that is not below malicious", () => {
     assert.throws(
       () => resolveThresholds({ suspicious: 0.8, malicious: 0.8 }),
-      (error: unknown) => error instanceof ShieldError && error.code === "invalid_request",
+      (error: unknown) =>
+        error instanceof ShieldError && error.code === "invalid_request",
     );
   });
 });

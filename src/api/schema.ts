@@ -6,7 +6,10 @@ const MAX_BODY_BYTES = 1_000_000;
 
 export function parseAnalyzeBody(raw: unknown): AnalyzeRequest {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    throw new ShieldError("invalid_request", "Request body must be a JSON object.");
+    throw new ShieldError(
+      "invalid_request",
+      "Request body must be a JSON object.",
+    );
   }
   const body = raw as Record<string, unknown>;
   if (typeof body.content !== "string") {
@@ -14,8 +17,14 @@ export function parseAnalyzeBody(raw: unknown): AnalyzeRequest {
   }
   const request: AnalyzeRequest = { content: body.content };
   if (body.source !== undefined) {
-    if (typeof body.source !== "string" || !SOURCES.includes(body.source as Source)) {
-      throw new ShieldError("invalid_request", `source must be one of: ${SOURCES.join(", ")}.`);
+    if (
+      typeof body.source !== "string" ||
+      !SOURCES.includes(body.source as Source)
+    ) {
+      throw new ShieldError(
+        "invalid_request",
+        `source must be one of: ${SOURCES.join(", ")}.`,
+      );
     }
     request.source = body.source as Source;
   }
@@ -40,7 +49,10 @@ function parseThresholds(raw: unknown): Partial<Thresholds> {
   for (const key of ["suspicious", "malicious"] as const) {
     if (body[key] !== undefined) {
       if (typeof body[key] !== "number") {
-        throw new ShieldError("invalid_request", `${key} threshold must be a number.`);
+        throw new ShieldError(
+          "invalid_request",
+          `${key} threshold must be a number.`,
+        );
       }
       thresholds[key] = body[key];
     }
@@ -48,14 +60,19 @@ function parseThresholds(raw: unknown): Partial<Thresholds> {
   return thresholds;
 }
 
-export async function readJsonBody(req: import("node:http").IncomingMessage): Promise<unknown> {
+export async function readJsonBody(
+  req: import("node:http").IncomingMessage,
+): Promise<unknown> {
   const chunks: Buffer[] = [];
   let bytes = 0;
   for await (const chunk of req) {
     const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
     bytes += buffer.length;
     if (bytes > MAX_BODY_BYTES) {
-      throw new ShieldError("oversize", "Request body is too large. Shield does not truncate.");
+      throw new ShieldError(
+        "oversize",
+        "Request body is too large. Shield does not truncate.",
+      );
     }
     chunks.push(buffer);
   }

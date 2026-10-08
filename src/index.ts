@@ -16,7 +16,11 @@ export {
   resolveThresholds,
 } from "./config.js";
 export { ShieldError, isShieldError, type ShieldErrorCode } from "./errors.js";
-export { createLiveJevClient, decisionFromScores, type JevClient } from "./jev/client.js";
+export {
+  createLiveJevClient,
+  decisionFromScores,
+  type JevClient,
+} from "./jev/client.js";
 export type { JevDecision } from "./engine/policy.js";
 export type {
   AnalyzeRequest,
@@ -30,4 +34,31 @@ export type {
   Usage,
   Verdict,
 } from "./types.js";
-export { CATEGORIES, CONTENT_ROLES, RISKS, SOURCES, VERDICTS } from "./types.js";
+export {
+  CATEGORIES,
+  CONTENT_ROLES,
+  RISKS,
+  SOURCES,
+  VERDICTS,
+} from "./types.js";
+export {
+  createActionClient,
+  ACTION_QUESTION_SET_VERSION,
+} from "./jev/action.js";
+export {
+  evaluateAction,
+  type EvaluateOptions,
+} from "./enforcement/evaluate.js";
+export {
+  resolveEnforcementConfig,
+  type EnforcementConfig,
+  type FailMode,
+} from "./enforcement/config.js";
+export type {
+  ActionContext,
+  ActionDecision,
+  Decision,
+  Decider,
+  EnvClass,
+} from "./enforcement/types.js";
+export { DECISIONS } from "./enforcement/types.js";

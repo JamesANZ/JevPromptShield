@@ -1,4 +1,9 @@
-import { JEV_INPUT_USD_PER_MILLION, POLICY_VERSION, QUESTION_SET_VERSION, resolveThresholds } from "../config.js";
+import {
+  JEV_INPUT_USD_PER_MILLION,
+  POLICY_VERSION,
+  QUESTION_SET_VERSION,
+  resolveThresholds,
+} from "../config.js";
 import { CATEGORIES } from "../types.js";
 import { resultFromDecision } from "../analyze.js";
 import { analyze } from "../analyze.js";
@@ -7,10 +12,17 @@ import { SOURCE_BLIND_SIGNAL } from "../engine/policy.js";
 import type { JevClient } from "../jev/client.js";
 import type { CorpusCase } from "./corpus.js";
 import { CORPUS_TAGS } from "./corpus.js";
-import { buildEvalReport, type EvalReport, type ScoredCase } from "./metrics.js";
+import {
+  buildEvalReport,
+  type EvalReport,
+  type ScoredCase,
+} from "./metrics.js";
 import { splitForId } from "./split.js";
 
-export function selectSplit(cases: CorpusCase[], split: "dev" | "test" | "all"): CorpusCase[] {
+export function selectSplit(
+  cases: CorpusCase[],
+  split: "dev" | "test" | "all",
+): CorpusCase[] {
   if (split === "all") return cases;
   return cases.filter((item) => splitForId(item.id) === split);
 }
@@ -48,7 +60,9 @@ export async function scoreCorpus(input: {
       } else {
         throw new Error("scoreCorpus needs a client or fixtures.");
       }
-      const triggered = CATEGORIES.filter((category) => result.signals[category]?.triggered === true);
+      const triggered = CATEGORIES.filter(
+        (category) => result.signals[category]?.triggered === true,
+      );
       const blind = result.signals[SOURCE_BLIND_SIGNAL]?.score;
       rows.push({
         id: item.id,
@@ -118,10 +132,14 @@ export function formatReport(report: EvalReport): string {
     `expected category recall ${formatRate(report.expected_category_recall)}`,
   ];
   if (report.latency_ms) {
-    lines.push(`latency p50 ${report.latency_ms.p50.toFixed(0)} ms  p95 ${report.latency_ms.p95.toFixed(0)} ms`);
+    lines.push(
+      `latency p50 ${report.latency_ms.p50.toFixed(0)} ms  p95 ${report.latency_ms.p95.toFixed(0)} ms`,
+    );
   }
   if (report.cost_per_1000_usd !== null) {
-    lines.push(`cost per 1,000 requests $${report.cost_per_1000_usd.toFixed(4)} at $${report.input_usd_per_million}/M input tokens`);
+    lines.push(
+      `cost per 1,000 requests $${report.cost_per_1000_usd.toFixed(4)} at $${report.input_usd_per_million}/M input tokens`,
+    );
   }
   lines.push("per tag (binary rows):");
   for (const [tag, metrics] of Object.entries(report.per_tag)) {

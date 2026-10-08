@@ -1,34 +1,31 @@
 # JEV Shield
 
-Jev Prompt Shield checks actions proposed by AI coding agents before those actions reach privileged tools such as your terminal.
+Coding agents treat incoming text as instructions. A prompt, a pasted page, or a tool result can tell the agent to ignore its task, reveal secrets, or hand data to someone else. The same agent can then propose a shell command that deletes files, rewrites a shared branch, or runs a downloaded script. JEV Shield checks both moments in Claude Code: before a prompt is accepted, and before a Bash command runs.
 
-The check runs at the tool boundary. Claude Code calls a `PreToolUse` hook, Shield decides, and only an allowed command executes. The agent does not choose whether to consult Shield, and a system prompt is not the control. An instruction to "be careful" is still a text generation: the same model can forget it, or a prompt injection can talk it out of it. A hook cannot be skipped by the model because the model is not the thing that runs the command.
+Every submitted prompt goes to [TypeSafe Jev](https://typesafe.ai), which scores it for prompt injection. Shield blocks the prompt when that score is not safe, and lets it through when it is. The TypeSafe key is read from the environment or from an MCP config Claude or Cursor already has, and it is never printed.
+
+A proposed Bash command is checked locally first. Obvious read-only commands are allowed and obvious destruction is blocked, with no network call. Other commands are sent to Jev. Jev returns probabilities, and ordinary code maps them to allow, ask you, or block. Claude Code calls these hooks itself, so the check runs outside the model.
 
 ```mermaid
-flowchart LR
-  agent[CodingAgent]
-  hook[PreToolUseHook]
-  local[LocalPolicy]
-  jev[Jev]
-  audit[AuditLog]
-  agent --> hook --> local
-  local -->|obvious ALLOW or BLOCK| audit
-  local -->|needs judgement| jev --> audit
-  audit --> decision[ALLOW_ASK_BLOCK]
-  decision --> hook
+flowchart TD
+  prompt[SubmittedPrompt] --> score[JevContentScore]
+  score -->|safe| accepted[PromptAccepted]
+  score -->|not safe| blocked[PromptBlocked]
+  command[ProposedBashCommand] --> local[LocalPolicy]
+  local -->|obvious allow or block| decision[AllowAskOrBlock]
+  local -->|needs judgement| review[JevActionReview]
+  review --> decision
 ```
 
-Shield returns one of three decisions:
+Bash decisions:
 
 | Decision | Claude Code                   | What happens                                                      |
-| -------- | ----------------------------- | ----------------------------------------------------------------- |
+|----------|-------------------------------|-------------------------------------------------------------------|
 | ALLOW    | `permissionDecision: "allow"` | The command may run. Claude's own deny and ask rules still apply. |
 | ASK      | `permissionDecision: "ask"`   | Claude Code prompts you before the command runs.                  |
 | BLOCK    | `permissionDecision: "deny"`  | The command does not run.                                         |
 
-Obvious cases are decided locally, with no network call. Commands that need semantic judgement go to [TypeSafe Jev](https://typesafe.ai). Jev returns probabilities. Ordinary code maps them to ALLOW, ASK, or BLOCK. This follows the gate-before-execute pattern described in [Using Jev to guard AI coding agents against destructive commands](https://jonathansblog.co.uk/using-jev-to-guard-ai-coding-agents-destructive-commands), with a local fast path and an ASK outcome added.
-
-The original prompt-injection scorer is still here. It scores untrusted text before an application passes that text to a model. See [Content scoring](#content-scoring) below.
+The Bash gate follows the pattern in [Using Jev to guard AI coding agents against destructive commands](https://jonathansblog.co.uk/using-jev-to-guard-ai-coding-agents-destructive-commands), with a local fast path and an ASK outcome. The same content score used on prompts is also available as a library and an HTTP API. See [Content scoring](#content-scoring).
 
 ## Install
 
@@ -37,7 +34,8 @@ Node.js 20 or newer.
 ```bash
 npm install
 npm run build
-export TYPESAFE_API_KEY=...   # server-side only
+# Optional when the key is already in an MCP config. Server-side only.
+export TYPESAFE_API_KEY=...
 ```
 
 The package binary is `jev-shield` (`./dist/src/cli.js`). After `npm link` or an install that puts `node_modules/.bin` on your PATH, the commands below work as `jev-shield`. From this checkout, run `node dist/src/cli.js` in their place.
@@ -45,8 +43,7 @@ The package binary is `jev-shield` (`./dist/src/cli.js`). After `npm link` or an
 ## Claude Code setup
 
 1. Build the project so `dist/src/cli.js` exists.
-2. Set `TYPESAFE_API_KEY` in the environment Claude Code will pass to the hook.
-3. Install the hook:
+2. Install the hooks. The TypeSafe key can already be in the environment or in an MCP config, as described below.
 
 ```bash
 node dist/src/cli.js setup claude
@@ -67,7 +64,7 @@ node dist/src/cli.js doctor
 node dist/src/cli.js test
 ```
 
-`doctor` checks Node, the CLI file, that `TYPESAFE_API_KEY` is set without printing it, that the hook entry exists, and that the audit log can be appended. It also prints `claude --version` when the binary is on PATH. `test` runs fixture commands through the local policy and a mock Jev. It does not call the network.
+`doctor` checks Node, the CLI file, that a TypeSafe key is available without printing it, that both hook entries exist, and that the audit log can be appended. It also prints `claude --version` when the binary is on PATH. `test` runs fixture commands through the local policy and a mock Jev. It does not call the network.
 
 The Bash hook command is the absolute path to this Node binary plus `hook claude`, with a 15 second host timeout. The Jev action call itself is capped (default 2.5 seconds, no retries) so a slow response becomes ASK or BLOCK inside the process. The hook always exits 0 and prints one JSON object. Claude Code treats other exit codes as non-blocking, which would let the command run.
 
@@ -78,8 +75,8 @@ The prompt hook command is `hook prompt`, with a 20 second host timeout and an 8
 Action-gate settings are environment variables. See [.env.example](.env.example).
 
 | Variable                    | Default                     | Meaning                                                                                                                 |
-| --------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `TYPESAFE_API_KEY`          | unset                       | TypeSafe key. Required for Jev. Never printed by `doctor`.                                                              |
+|-----------------------------|-----------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| `TYPESAFE_API_KEY`          | unset                       | TypeSafe key. Required for Jev. Read from the environment, or from an MCP config. Never printed.                        |
 | `JEV_SHIELD_FAIL_MODE`      | `ask`                       | When Jev cannot be reached: `ask` prompts you, `block` denies the command. Local allows and local blocks are unchanged. |
 | `JEV_SHIELD_ENV_CLASS`      | unset                       | `dev`, `staging`, or `production`. Sent to Jev as a label.                                                              |
 | `JEV_SHIELD_AUDIT_LOG`      | `~/.jev-shield/audit.jsonl` | Append-only decision log.                                                                                               |
@@ -153,7 +150,7 @@ Claude Code is the installable adapter. Cursor, Codex, and a guarded shell wrapp
 
 ## Content scoring
 
-`jev-shield analyze` and `POST /v1/analyze` score one piece of untrusted text for prompt injection. Jev answers a fixed checklist and returns a probability per question. It does not write the verdict. Thresholds in ordinary code map the source-conditioned score to `safe`, `suspicious`, or `malicious`. A Jev failure throws. It is never reported as safe.
+`jev-shield analyze` and `POST /v1/analyze` use the same content score as the prompt hook. They score one piece of untrusted text for prompt injection. Jev answers a fixed checklist and returns a probability per question. Thresholds in ordinary code map that score to `safe`, `suspicious`, or `malicious`. A Jev failure throws and is never reported as safe.
 
 ```ts
 import { jevShield } from "jev-shield";

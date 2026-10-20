@@ -1,10 +1,13 @@
 import { ShieldError } from "../errors.js";
-import type { AnalyzeRequest, Thresholds } from "../types.js";
+import { prepareMedia, type MediaKind } from "../media/transcribe.js";
+import type { AnalyzeRequest, MediaAttachment, Thresholds } from "../types.js";
 import { SOURCES, type Source } from "../types.js";
 
-const MAX_BODY_BYTES = 1_000_000;
+/** Text JSON stays at the original cap. Media JSON may be larger, up to the decoded media cap. */
+const MAX_TEXT_BODY_BYTES = 1_000_000;
+export const MAX_HTTP_BODY_BYTES = 16_000_000;
 
-export function parseAnalyzeBody(raw: unknown): AnalyzeRequest {
+export function parseAnalyzeBody(raw: unknown, bytes?: number): AnalyzeRequest {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
     throw new ShieldError(
       "invalid_request",
@@ -12,10 +15,40 @@ export function parseAnalyzeBody(raw: unknown): AnalyzeRequest {
     );
   }
   const body = raw as Record<string, unknown>;
-  if (typeof body.content !== "string") {
+  const hasContent = body.content !== undefined;
+  const hasImage = body.image !== undefined;
+  const hasAudio = body.audio !== undefined;
+  const attachments = Number(hasContent) + Number(hasImage) + Number(hasAudio);
+  if (attachments > 1) {
+    throw new ShieldError(
+      "invalid_request",
+      "Pass content, image, or audio, not more than one.",
+    );
+  }
+  if (
+    !hasImage &&
+    !hasAudio &&
+    bytes !== undefined &&
+    bytes > MAX_TEXT_BODY_BYTES
+  ) {
+    throw new ShieldError(
+      "oversize",
+      "Request body is too large. Shield does not truncate.",
+    );
+  }
+  const request: AnalyzeRequest = {};
+  if (hasContent) {
+    if (typeof body.content !== "string") {
+      throw new ShieldError("invalid_request", "content must be a string.");
+    }
+    request.content = body.content;
+  } else if (hasImage) {
+    request.image = parseAttachment("image", body.image);
+  } else if (hasAudio) {
+    request.audio = parseAttachment("audio", body.audio);
+  } else {
     throw new ShieldError("invalid_request", "content must be a string.");
   }
-  const request: AnalyzeRequest = { content: body.content };
   if (body.source !== undefined) {
     if (
       typeof body.source !== "string" ||
@@ -40,6 +73,33 @@ export function parseAnalyzeBody(raw: unknown): AnalyzeRequest {
   return request;
 }
 
+function parseAttachment(kind: MediaKind, raw: unknown): MediaAttachment {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new ShieldError(
+      "invalid_request",
+      `${kind} must be an object with media_type and data.`,
+    );
+  }
+  const body = raw as Record<string, unknown>;
+  if (typeof body.media_type !== "string") {
+    throw new ShieldError(
+      "invalid_request",
+      `${kind}.media_type must be a string.`,
+    );
+  }
+  if (typeof body.data !== "string") {
+    throw new ShieldError(
+      "invalid_request",
+      `${kind}.data must be a base64 string.`,
+    );
+  }
+  const prepared = prepareMedia(kind, {
+    media_type: body.media_type,
+    data: body.data,
+  });
+  return { media_type: prepared.mediaType, data: body.data };
+}
+
 function parseThresholds(raw: unknown): Partial<Thresholds> {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
     throw new ShieldError("invalid_request", "thresholds must be an object.");
@@ -62,13 +122,13 @@ function parseThresholds(raw: unknown): Partial<Thresholds> {
 
 export async function readJsonBody(
   req: import("node:http").IncomingMessage,
-): Promise<unknown> {
+): Promise<{ value: unknown; bytes: number }> {
   const chunks: Buffer[] = [];
   let bytes = 0;
   for await (const chunk of req) {
     const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
     bytes += buffer.length;
-    if (bytes > MAX_BODY_BYTES) {
+    if (bytes > MAX_HTTP_BODY_BYTES) {
       throw new ShieldError(
         "oversize",
         "Request body is too large. Shield does not truncate.",
@@ -81,7 +141,7 @@ export async function readJsonBody(
     throw new ShieldError("invalid_request", "Request body is empty.");
   }
   try {
-    return JSON.parse(text) as unknown;
+    return { value: JSON.parse(text) as unknown, bytes };
   } catch {
     throw new ShieldError("invalid_request", "Request body is not valid JSON.");
   }

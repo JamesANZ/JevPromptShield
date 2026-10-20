@@ -123,7 +123,7 @@ Action-gate settings are environment variables. See [.env.example](.env.example)
 | `JEV_SHIELD_AUDIT_LOG` | `~/.jev-shield/audit.jsonl` | Append-only decision log. |
 | `JEV_SHIELD_JEV_TIMEOUT_MS` | `2500` | Per-attempt timeout for an action review, from 100 to 10000. |
 
-The content scorer uses `JEV_SHIELD_SUSPICIOUS_THRESHOLD` and `JEV_SHIELD_MALICIOUS_THRESHOLD`.
+The content scorer uses `JEV_SHIELD_SUSPICIOUS_THRESHOLD` and `JEV_SHIELD_MALICIOUS_THRESHOLD`. Image and audio transcription use `OPENAI_API_KEY`. `JEV_SHIELD_VISION_MODEL` defaults to `gpt-4o-mini`, `JEV_SHIELD_TRANSCRIBE_MODEL` defaults to `whisper-1`, and `JEV_SHIELD_TRANSCRIBE_TIMEOUT_MS` defaults to `30000`.
 
 Shield sends Jev a redacted command, the working directory, the git branch name when `git rev-parse` succeeds, the environment class, the tool name, and the agent's description marked as untrusted. It does not send environment variables, credentials, file contents, or the transcript. The same redaction is applied to the audit log. Credential-shaped substrings are replaced with `[redacted]`.
 
@@ -190,8 +190,25 @@ if (!result.safe) {
 }
 ```
 
+An image or an audio file is transcribed first. Jev then scores that transcript with the same checklist, and the response includes `transcript`. Text written into a screenshot, a photo, or a scan is the image case. Speech is the audio case. Pass one of `content`, `image`, or `audio`.
+
+```ts
+const fromImage = await jevShield.analyzeImage(
+  { media_type: "image/png", data: imageBytes },
+  { source: "webpage" },
+);
+const fromAudio = await jevShield.analyzeAudio(
+  { media_type: "audio/mpeg", data: audioBytes },
+  { source: "user" },
+);
+```
+
+`image.data` and `audio.data` are raw bytes in process, or standard base64 on `POST /v1/analyze`. Images are png, jpeg, gif, or webp. Audio is mp3, wav, webm, mp4, m4a, ogg, or flac. Either attachment is rejected above 10 MB. A transcription failure is `transcription_error` and is never reported as safe. Empty text from the image, or empty speech from the audio, is rejected the same way as empty `content`.
+
 ```bash
 node dist/src/cli.js analyze --source webpage --file page.txt
+node dist/src/cli.js analyze --source webpage --image shot.png
+node dist/src/cli.js analyze --source user --audio note.mp3
 node dist/src/cli.js serve
 node dist/src/cli.js corpus
 node dist/src/cli.js eval --split test

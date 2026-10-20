@@ -1,6 +1,7 @@
 export const SHIELD_ERROR_CODES = [
   "invalid_request",
   "oversize",
+  "transcription_error",
   "jev_auth",
   "jev_payment",
   "jev_rate_limit",
@@ -13,6 +14,7 @@ export type ShieldErrorCode = (typeof SHIELD_ERROR_CODES)[number];
 const STATUS: Record<ShieldErrorCode, number> = {
   invalid_request: 400,
   oversize: 400,
+  transcription_error: 502,
   jev_auth: 401,
   jev_payment: 402,
   jev_rate_limit: 429,

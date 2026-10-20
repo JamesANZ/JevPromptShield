@@ -21,6 +21,7 @@ import { runSelfCheck } from "./enforcement/self-check.js";
 import { analyze } from "./analyze.js";
 import { createServer } from "./api/server.js";
 import { isShieldError } from "./errors.js";
+import { mediaTypeForFilename } from "./media/transcribe.js";
 import { loadCorpus } from "./eval/corpus.js";
 import { CORPUS_TAGS } from "./eval/corpus.js";
 import { SOURCES, type Source } from "./types.js";
@@ -57,6 +58,8 @@ async function readFlags() {
       source: { type: "string" },
       file: { type: "string" },
       content: { type: "string" },
+      image: { type: "string" },
+      audio: { type: "string" },
       context: { type: "string" },
       split: { type: "string", default: "test" },
       fixture: { type: "string" },
@@ -187,6 +190,8 @@ jev-shield hook claude
 jev-shield hook prompt
 jev-shield analyze --source webpage --file page.txt
 jev-shield analyze --source user --content "text"
+jev-shield analyze --source webpage --image shot.png
+jev-shield analyze --source user --audio note.mp3
 jev-shield serve [--port 8787] [--host 127.0.0.1]
 jev-shield corpus
 jev-shield eval [--split test|dev|all] [--fixture scores.jsonl] [--baseline] [--canary]
@@ -211,24 +216,49 @@ gandalf scores the published Gandalf solutions with Shield before a defender cal
   }
 
   if (command === "analyze") {
-    let content = values.content;
-    if (values.file) {
-      const { readFile } = await import("node:fs/promises");
-      content = await readFile(values.file, "utf8");
+    const inputs = [
+      values.content,
+      values.file,
+      values.image,
+      values.audio,
+    ].filter((value) => value !== undefined);
+    if (inputs.length !== 1) {
+      fail("Pass one of --content, --file, --image, or --audio.");
     }
-    if (!content) fail("Pass --content or --file.");
     if (!values.source || !SOURCES.includes(values.source as Source)) {
       fail(
         "Pass --source (user, webpage, pdf, email, rag, tool, mcp, agent, database, unknown).",
       );
     }
     const source = values.source as Source;
+    const context = values.context ? { context: values.context } : {};
     try {
-      const result = await analyze({
-        content,
-        source,
-        ...(values.context ? { context: values.context } : {}),
-      });
+      const { readFile } = await import("node:fs/promises");
+      const result = values.image
+        ? await analyze({
+            image: {
+              media_type: mediaTypeForFilename(values.image, "image"),
+              data: await readFile(values.image),
+            },
+            source,
+            ...context,
+          })
+        : values.audio
+          ? await analyze({
+              audio: {
+                media_type: mediaTypeForFilename(values.audio, "audio"),
+                data: await readFile(values.audio),
+              },
+              source,
+              ...context,
+            })
+          : await analyze({
+              content: values.file
+                ? await readFile(values.file, "utf8")
+                : values.content,
+              source,
+              ...context,
+            });
       printResult(result);
     } catch (error) {
       if (isShieldError(error))

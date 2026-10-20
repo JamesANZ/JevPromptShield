@@ -71,7 +71,7 @@ Untrusted text is placed in Jev `state` together with `source`, `trust`, and `co
 
 ### Out of scope
 
-The scorer does not make the downstream model incapable of a jailbreak. It does not scan model output in this version. It does not accept images or audio. It does not authenticate end users. A score can still move because attacker text sits in `state`; published decision-hijacking measurements on Jev found that movement rarely selected an attacker-chosen action, and that adaptive access to scores moved probabilities further. This evaluation is non-adaptive.
+The scorer does not make the downstream model incapable of a jailbreak. It does not scan model output in this version. An image is scored only after the visible writing is transcribed, and audio only after the speech is transcribed. Pixels or sound with no readable text are rejected. It does not authenticate end users. A score can still move because attacker text sits in `state`; published decision-hijacking measurements on Jev found that movement rarely selected an attacker-chosen action, and that adaptive access to scores moved probabilities further. This evaluation is non-adaptive.
 
 Requests that exceed the character cap are rejected. Shield does not silently truncate them into a shorter string and then call it safe.
 

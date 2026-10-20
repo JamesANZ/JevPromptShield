@@ -49,8 +49,16 @@ export interface Thresholds {
   malicious: number;
 }
 
+/** Image or audio bytes. `data` is raw bytes in-process, or standard base64 on the HTTP API. */
+export interface MediaAttachment {
+  media_type: string;
+  data: string | Uint8Array;
+}
+
 export interface AnalyzeRequest {
-  content: string;
+  content?: string;
+  image?: MediaAttachment;
+  audio?: MediaAttachment;
   source?: Source;
   context?: string;
   thresholds?: Partial<Thresholds>;
@@ -81,4 +89,9 @@ export interface AnalyzeResult {
   latency_ms: number;
   policy_version: string;
   question_set_version: string;
+  /**
+   * Text read from an image or audio attachment and then scored.
+   * Omitted for ordinary text requests.
+   */
+  transcript?: string;
 }

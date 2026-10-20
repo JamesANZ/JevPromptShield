@@ -3,14 +3,20 @@ import {
   MAX_CONTEXT_CHARS,
   resolveThresholds,
 } from "./config.js";
-import { ShieldError } from "./errors.js";
+import { isShieldError, ShieldError } from "./errors.js";
 import { applyPolicy, type JevDecision } from "./engine/policy.js";
 import { createLiveJevClient, type JevClient } from "./jev/client.js";
+import {
+  createOpenAiMediaTranscriber,
+  prepareMedia,
+  type MediaTranscriber,
+} from "./media/transcribe.js";
 import type { AnalyzeRequest, AnalyzeResult, Source } from "./types.js";
 import { SOURCES } from "./types.js";
 
 export interface AnalyzeOptions {
   client?: JevClient;
+  transcriber?: MediaTranscriber;
 }
 
 export function normalizeRequest(request: AnalyzeRequest): {
@@ -69,16 +75,72 @@ export function resultFromDecision(
   };
 }
 
+async function submittedContent(
+  request: AnalyzeRequest,
+  options?: AnalyzeOptions,
+): Promise<{ content: string; transcript?: string }> {
+  const hasImage = request.image !== undefined;
+  const hasAudio = request.audio !== undefined;
+  const hasContent = request.content !== undefined;
+  if (Number(hasImage) + Number(hasAudio) + Number(hasContent) > 1) {
+    throw new ShieldError(
+      "invalid_request",
+      "Pass content, image, or audio, not more than one.",
+    );
+  }
+  if (!hasImage && !hasAudio) return { content: request.content ?? "" };
+
+  const kind = hasImage ? "image" : "audio";
+  const attachment = hasImage ? request.image : request.audio;
+  if (!attachment) return { content: request.content ?? "" };
+  const prepared = prepareMedia(kind, attachment);
+  const transcriber = options?.transcriber ?? createOpenAiMediaTranscriber();
+  let raw: string;
+  try {
+    raw =
+      kind === "image"
+        ? await transcriber.transcribeImage(prepared)
+        : await transcriber.transcribeAudio(prepared);
+  } catch (error) {
+    if (isShieldError(error)) throw error;
+    throw new ShieldError(
+      "transcription_error",
+      error instanceof Error ? error.message : "Transcription failed.",
+      { cause: error },
+    );
+  }
+  const transcript = raw.trim();
+  if (transcript === "") {
+    throw new ShieldError(
+      "invalid_request",
+      kind === "image"
+        ? "No text could be read from the image."
+        : "No speech could be transcribed from the audio.",
+    );
+  }
+  return { content: transcript, transcript };
+}
+
 export async function analyze(
   request: AnalyzeRequest,
   options?: AnalyzeOptions,
 ): Promise<AnalyzeResult> {
-  const normalized = normalizeRequest(request);
+  const submitted = await submittedContent(request, options);
+  const normalized = normalizeRequest({
+    ...request,
+    content: submitted.content,
+  });
   const thresholds = resolveThresholds(request.thresholds);
   const client = options?.client ?? createLiveJevClient();
   const started = performance.now();
   const decision = await client.decide(normalized);
-  return resultFromDecision(decision, thresholds, performance.now() - started);
+  const result = resultFromDecision(
+    decision,
+    thresholds,
+    performance.now() - started,
+  );
+  if (submitted.transcript === undefined) return result;
+  return { ...result, transcript: submitted.transcript };
 }
 
 export const jevShield = {
@@ -88,9 +150,34 @@ export const jevShield = {
    */
   analyze(
     content: string,
-    options?: Omit<AnalyzeRequest, "content"> & AnalyzeOptions,
+    options?: Omit<AnalyzeRequest, "content" | "image" | "audio"> &
+      AnalyzeOptions,
   ): Promise<AnalyzeResult> {
-    const { client, ...request } = options ?? {};
-    return analyze({ content, ...request }, { client });
+    const { client, transcriber, ...request } = options ?? {};
+    return analyze({ content, ...request }, { client, transcriber });
+  },
+
+  /**
+   * Read visible writing from an image, then score that text with the same decision path as `analyze`.
+   */
+  analyzeImage(
+    image: AnalyzeRequest["image"],
+    options?: Omit<AnalyzeRequest, "content" | "image" | "audio"> &
+      AnalyzeOptions,
+  ): Promise<AnalyzeResult> {
+    const { client, transcriber, ...request } = options ?? {};
+    return analyze({ ...request, image }, { client, transcriber });
+  },
+
+  /**
+   * Transcribe speech, then score that transcript with the same decision path as `analyze`.
+   */
+  analyzeAudio(
+    audio: AnalyzeRequest["audio"],
+    options?: Omit<AnalyzeRequest, "content" | "image" | "audio"> &
+      AnalyzeOptions,
+  ): Promise<AnalyzeResult> {
+    const { client, transcriber, ...request } = options ?? {};
+    return analyze({ ...request, audio }, { client, transcriber });
   },
 };

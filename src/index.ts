@@ -31,6 +31,7 @@ export type {
   Signal,
   Source,
   Thresholds,
+  MediaAttachment,
   Usage,
   Verdict,
 } from "./types.js";

@@ -7,10 +7,12 @@ import { QUESTION_SET_VERSION, POLICY_VERSION } from "../config.js";
 import { analyze } from "../analyze.js";
 import { isShieldError } from "../errors.js";
 import type { JevClient } from "../jev/client.js";
+import type { MediaTranscriber } from "../media/transcribe.js";
 import { parseAnalyzeBody, readJsonBody } from "./schema.js";
 
 export interface ServerOptions {
   client?: JevClient;
+  transcriber?: MediaTranscriber;
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -61,9 +63,12 @@ export function createServer(options: ServerOptions = {}) {
         });
         return;
       }
-      const body = parseAnalyzeBody(await readJsonBody(req));
-      const analyzeOptions = options.client ? { client: options.client } : {};
-      const result = await analyze(body, analyzeOptions);
+      const uploaded = await readJsonBody(req);
+      const body = parseAnalyzeBody(uploaded.value, uploaded.bytes);
+      const result = await analyze(body, {
+        ...(options.client ? { client: options.client } : {}),
+        ...(options.transcriber ? { transcriber: options.transcriber } : {}),
+      });
       sendJson(res, 200, result);
     } catch (error) {
       sendError(res, error);

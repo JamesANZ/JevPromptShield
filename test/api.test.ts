@@ -5,12 +5,18 @@ import type { AddressInfo } from "node:net";
 import { createServer } from "../src/api/server.js";
 import { ShieldError } from "../src/errors.js";
 import { decisionFromScores, type JevClient } from "../src/jev/client.js";
+import type { DocumentJudge } from "../src/jev/documents.js";
 import type { MediaTranscriber } from "../src/media/transcribe.js";
 
-function listen(client: JevClient, transcriber?: MediaTranscriber) {
+function listen(
+  client: JevClient,
+  transcriber?: MediaTranscriber,
+  judge?: DocumentJudge,
+) {
   const server = createServer({
     client,
     ...(transcriber ? { transcriber } : {}),
+    ...(judge ? { judge } : {}),
   });
   server.listen(0, "127.0.0.1");
   return once(server, "listening").then(() => {
@@ -151,6 +157,63 @@ describe("http", () => {
       assert.equal(unsupported.status, 400);
       const error = (await unsupported.json()) as { error: { code: string } };
       assert.equal(error.error.code, "invalid_request");
+    } finally {
+      server.closeAllConnections();
+      server.close();
+    }
+  });
+
+  it("compares documents and lists the ones that match", async () => {
+    const { server, url } = await listen(
+      {
+        async decide() {
+          return decisionFromScores({});
+        },
+      },
+      undefined,
+      {
+        async judge() {
+          return {
+            model: "fixture",
+            input_tokens: 30,
+            output_tokens: 2,
+            scores: [0.93, 0.11],
+          };
+        },
+      },
+    );
+    try {
+      const response = await fetch(`${url}/v1/compare`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          question: "Which document mentions Gerald?",
+          documents: [
+            { name: "notes.txt", content: "Gerald joined the meeting." },
+            { name: "clinic.txt", content: "The clinic covers checkups." },
+          ],
+        }),
+      });
+      assert.equal(response.status, 200);
+      const body = (await response.json()) as {
+        matches: { name: string; score: number }[];
+        documents: { matches: boolean }[];
+      };
+      assert.deepEqual(
+        body.matches.map((match) => match.name),
+        ["notes.txt"],
+      );
+      assert.equal(body.matches[0]?.score, 0.93);
+      assert.equal(body.documents[1]?.matches, false);
+      const missing = await fetch(`${url}/v1/compare`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          question: "Which document is about health?",
+          documents: [{ content: "only one" }],
+        }),
+      });
+      assert.equal(missing.status, 400);
     } finally {
       server.closeAllConnections();
       server.close();

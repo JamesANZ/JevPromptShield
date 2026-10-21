@@ -1,6 +1,12 @@
 import { ShieldError } from "../errors.js";
 import { prepareMedia, type MediaKind } from "../media/transcribe.js";
-import type { AnalyzeRequest, MediaAttachment, Thresholds } from "../types.js";
+import type {
+  AnalyzeRequest,
+  CompareDocument,
+  CompareRequest,
+  MediaAttachment,
+  Thresholds,
+} from "../types.js";
 import { SOURCES, type Source } from "../types.js";
 
 /** Text JSON stays at the original cap. Media JSON may be larger, up to the decoded media cap. */
@@ -71,6 +77,89 @@ export function parseAnalyzeBody(raw: unknown, bytes?: number): AnalyzeRequest {
     request.thresholds = parseThresholds(body.thresholds);
   }
   return request;
+}
+
+export function parseCompareBody(raw: unknown, bytes?: number): CompareRequest {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new ShieldError(
+      "invalid_request",
+      "Request body must be a JSON object.",
+    );
+  }
+  const body = raw as Record<string, unknown>;
+  if (typeof body.question !== "string") {
+    throw new ShieldError("invalid_request", "question must be a string.");
+  }
+  if (!Array.isArray(body.documents)) {
+    throw new ShieldError("invalid_request", "documents must be an array.");
+  }
+  const documents = body.documents.map((item) => parseCompareDocument(item));
+  const hasMedia = documents.some(
+    (document) => document.image !== undefined || document.audio !== undefined,
+  );
+  if (!hasMedia && bytes !== undefined && bytes > MAX_TEXT_BODY_BYTES) {
+    throw new ShieldError(
+      "oversize",
+      "Request body is too large. Shield does not truncate.",
+    );
+  }
+  const request: CompareRequest = { question: body.question, documents };
+  if (body.threshold !== undefined) {
+    if (typeof body.threshold !== "number") {
+      throw new ShieldError("invalid_request", "threshold must be a number.");
+    }
+    request.threshold = body.threshold;
+  }
+  return request;
+}
+
+function parseCompareDocument(raw: unknown): CompareDocument {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new ShieldError(
+      "invalid_request",
+      "Each document must be an object.",
+    );
+  }
+  const body = raw as Record<string, unknown>;
+  const hasContent = body.content !== undefined;
+  const hasImage = body.image !== undefined;
+  const hasAudio = body.audio !== undefined;
+  if (Number(hasContent) + Number(hasImage) + Number(hasAudio) !== 1) {
+    throw new ShieldError(
+      "invalid_request",
+      "Each document must include content, image, or audio, and only one of them.",
+    );
+  }
+  const document: CompareDocument = {};
+  if (body.id !== undefined) {
+    if (typeof body.id !== "string") {
+      throw new ShieldError("invalid_request", "document id must be a string.");
+    }
+    document.id = body.id;
+  }
+  if (body.name !== undefined) {
+    if (typeof body.name !== "string") {
+      throw new ShieldError(
+        "invalid_request",
+        "document name must be a string.",
+      );
+    }
+    document.name = body.name;
+  }
+  if (hasContent) {
+    if (typeof body.content !== "string") {
+      throw new ShieldError(
+        "invalid_request",
+        "document content must be a string.",
+      );
+    }
+    document.content = body.content;
+  } else if (hasImage) {
+    document.image = parseAttachment("image", body.image);
+  } else {
+    document.audio = parseAttachment("audio", body.audio);
+  }
+  return document;
 }
 
 function parseAttachment(kind: MediaKind, raw: unknown): MediaAttachment {

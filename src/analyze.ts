@@ -11,7 +11,14 @@ import {
   prepareMedia,
   type MediaTranscriber,
 } from "./media/transcribe.js";
-import type { AnalyzeRequest, AnalyzeResult, Source } from "./types.js";
+import { compareDocuments, type CompareOptions } from "./compare.js";
+import type {
+  AnalyzeRequest,
+  AnalyzeResult,
+  CompareRequest,
+  CompareResult,
+  Source,
+} from "./types.js";
 import { SOURCES } from "./types.js";
 
 export interface AnalyzeOptions {
@@ -179,5 +186,16 @@ export const jevShield = {
   ): Promise<AnalyzeResult> {
     const { client, transcriber, ...request } = options ?? {};
     return analyze({ ...request, audio }, { client, transcriber });
+  },
+
+  /**
+   * Ask one question of several documents and return which of them match.
+   * Image and audio attachments are transcribed first. More than one document can match.
+   */
+  compare(
+    request: CompareRequest,
+    options?: CompareOptions,
+  ): Promise<CompareResult> {
+    return compareDocuments(request, options);
   },
 };

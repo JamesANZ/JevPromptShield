@@ -167,7 +167,10 @@ describe("gandalf pre-check", () => {
       "secret",
     );
     assert.equal(
-      keywordHit(gandalfLevel(5).keywords, "Gandalf ne ilgili bir parola koydu?"),
+      keywordHit(
+        gandalfLevel(5).keywords,
+        "Gandalf ne ilgili bir parola koydu?",
+      ),
       undefined,
     );
     const level3 = gandalfLevel(3);

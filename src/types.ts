@@ -64,6 +64,46 @@ export interface AnalyzeRequest {
   thresholds?: Partial<Thresholds>;
 }
 
+/** One attachment in a comparison. Exactly one of content, image, or audio. */
+export interface CompareDocument {
+  id?: string;
+  name?: string;
+  content?: string;
+  image?: MediaAttachment;
+  audio?: MediaAttachment;
+}
+
+export interface CompareRequest {
+  question: string;
+  documents: CompareDocument[];
+  threshold?: number;
+}
+
+export interface CompareDocumentResult {
+  id: string;
+  name: string;
+  score: number;
+  matches: boolean;
+  /**
+   * Text read from an image or audio attachment before the comparison.
+   * Omitted for ordinary text documents.
+   */
+  transcript?: string;
+}
+
+export interface CompareResult {
+  question: string;
+  threshold: number;
+  /** Documents in the order they were attached. */
+  documents: CompareDocumentResult[];
+  /** Documents at or above the match threshold, highest score first. */
+  matches: CompareDocumentResult[];
+  model: string;
+  usage: Usage;
+  latency_ms: number;
+  question_set_version: string;
+}
+
 export interface Signal {
   score: number;
   triggered: boolean;

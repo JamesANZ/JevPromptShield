@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 import {
@@ -19,12 +19,13 @@ import {
 } from "./adapters/claude/install.js";
 import { runSelfCheck } from "./enforcement/self-check.js";
 import { analyze } from "./analyze.js";
+import { compareDocuments } from "./compare.js";
 import { createServer } from "./api/server.js";
-import { isShieldError } from "./errors.js";
-import { mediaTypeForFilename } from "./media/transcribe.js";
+import { isShieldError, ShieldError } from "./errors.js";
+import { attachmentKind, mediaTypeForFilename } from "./media/transcribe.js";
 import { loadCorpus } from "./eval/corpus.js";
 import { CORPUS_TAGS } from "./eval/corpus.js";
-import { SOURCES, type Source } from "./types.js";
+import { SOURCES, type CompareDocument, type Source } from "./types.js";
 import { evaluateCorpus, formatReport, selectSplit } from "./eval/run.js";
 import { loadCanary, runCanary } from "./eval/canary.js";
 import {
@@ -170,6 +171,99 @@ async function runGateCommand(command: string): Promise<void> {
   fail(`Unknown command ${command}. Run jev-shield help.`);
 }
 
+async function loadCompareDocument(
+  path: string,
+  forced?: "image" | "audio" | "text",
+): Promise<CompareDocument> {
+  const { readFile } = await import("node:fs/promises");
+  const name = basename(path);
+  const kind = forced ?? attachmentKind(path);
+  if (kind === "image") {
+    return {
+      name,
+      image: {
+        media_type: mediaTypeForFilename(path, "image"),
+        data: await readFile(path),
+      },
+    };
+  }
+  if (kind === "audio") {
+    return {
+      name,
+      audio: {
+        media_type: mediaTypeForFilename(path, "audio"),
+        data: await readFile(path),
+      },
+    };
+  }
+  const bytes = await readFile(path);
+  if (bytes.includes(0)) {
+    throw new ShieldError(
+      "invalid_request",
+      `${name} is not a text document. Pass text, or an image of the page.`,
+    );
+  }
+  return { name, content: bytes.toString("utf8") };
+}
+
+async function runCompare(): Promise<void> {
+  const { values, positionals } = parseArgs({
+    args: process.argv.slice(3),
+    options: {
+      question: { type: "string" },
+      file: { type: "string", multiple: true },
+      image: { type: "string", multiple: true },
+      audio: { type: "string", multiple: true },
+      threshold: { type: "string" },
+    },
+    allowPositionals: true,
+    strict: true,
+  });
+  if (!values.question || values.question.trim() === "") {
+    fail(
+      'Pass --question, for example --question "Which document mentions Gerald?"',
+    );
+  }
+  const tagged: { path: string; kind?: "image" | "audio" | "text" }[] = [
+    ...(values.file ?? []).map((path) => ({ path, kind: "text" as const })),
+    ...(values.image ?? []).map((path) => ({ path, kind: "image" as const })),
+    ...(values.audio ?? []).map((path) => ({ path, kind: "audio" as const })),
+    ...positionals.map((path) => ({ path })),
+  ];
+  if (tagged.length < 2) {
+    fail("Attach at least two documents. Pass paths, or repeat --file.");
+  }
+  let threshold: number | undefined;
+  if (values.threshold !== undefined) {
+    threshold = Number(values.threshold);
+    if (values.threshold.trim() === "" || !Number.isFinite(threshold)) {
+      fail("--threshold must be a number from 0 to 1.");
+    }
+  }
+  try {
+    const documents = [];
+    for (const item of tagged) {
+      documents.push(await loadCompareDocument(item.path, item.kind));
+    }
+    const result = await compareDocuments({
+      question: values.question,
+      documents,
+      ...(threshold !== undefined ? { threshold } : {}),
+    });
+    printResult(result);
+  } catch (error) {
+    if (isShieldError(error)) {
+      fail(
+        JSON.stringify({
+          error: { code: error.code, message: error.message },
+        }),
+      );
+    }
+    const message = error instanceof Error ? error.message : "Compare failed.";
+    fail(message);
+  }
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2] ?? "help";
   if (
@@ -179,6 +273,10 @@ async function main(): Promise<void> {
     command === "hook"
   ) {
     await runGateCommand(command);
+    return;
+  }
+  if (command === "compare") {
+    await runCompare();
     return;
   }
   const { values } = await readFlags();
@@ -192,6 +290,7 @@ jev-shield analyze --source webpage --file page.txt
 jev-shield analyze --source user --content "text"
 jev-shield analyze --source webpage --image shot.png
 jev-shield analyze --source user --audio note.mp3
+jev-shield compare --question "Which document mentions Gerald?" notes.txt clinic.txt
 jev-shield serve [--port 8787] [--host 127.0.0.1]
 jev-shield corpus
 jev-shield eval [--split test|dev|all] [--fixture scores.jsonl] [--baseline] [--canary]
@@ -199,6 +298,7 @@ jev-shield eval-public --file external.jsonl
 jev-shield gandalf
 
 setup installs a Claude Code Bash PreToolUse hook and a UserPromptSubmit hook that scores every prompt with Jev. test runs local fixtures and does not call Jev.
+compare asks one question of two to eight documents and lists every document that matches. Text, images, and audio can be mixed. A PDF page needs to be text or an image.
 Live eval needs TYPESAFE_API_KEY. Without a key or a fixture file, eval exits 2 and does not invent scores.
 gandalf scores the published Gandalf solutions with Shield before a defender call and prints that pre-check report.
 `);

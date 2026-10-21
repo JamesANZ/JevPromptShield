@@ -87,6 +87,10 @@ export interface OpenAiTranscriberOptions {
   fetch?: typeof fetch;
 }
 
+export function attachmentKind(filename: string): MediaKind | "text" {
+  return EXTENSIONS[extname(filename).toLowerCase()]?.kind ?? "text";
+}
+
 export function mediaTypeForFilename(
   filename: string,
   kind: MediaKind,

@@ -41,7 +41,10 @@ describe("questions", () => {
     assert.equal(QUESTION_SET_VERSION, "2026-10-08.2");
     const serialized = JSON.stringify(INSTRUCTIONS);
     assert.match(serialized, /state\.trust/);
-    assert.match(serialized, /Ignore state\.source, state\.trust, and state\.context/);
+    assert.match(
+      serialized,
+      /Ignore state\.source, state\.trust, and state\.context/,
+    );
     assert.match(serialized, /When state\.context is present/);
     assert.equal(serialized.includes("CANARY-7f3a"), false);
     assert.ok("prompt_injection_source_blind" in SHIELD_QUESTIONS);

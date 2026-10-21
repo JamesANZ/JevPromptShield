@@ -112,10 +112,7 @@ export interface GandalfTurn {
 }
 
 export type GandalfOutcome =
-  | "rejected"
-  | "held_by_keyword"
-  | "reached_defender"
-  | "error";
+  "rejected" | "held_by_keyword" | "reached_defender" | "error";
 
 export interface GandalfTurnResult {
   id: string;
@@ -261,7 +258,11 @@ export function parseGandalfTurn(raw: unknown, line: number): GandalfTurn {
       `Gandalf case ${raw.id} is missing session.`,
     );
   }
-  if (typeof raw.turn !== "number" || !Number.isInteger(raw.turn) || raw.turn < 1) {
+  if (
+    typeof raw.turn !== "number" ||
+    !Number.isInteger(raw.turn) ||
+    raw.turn < 1
+  ) {
     throw new ShieldError(
       "invalid_request",
       `Gandalf case ${raw.id} has an invalid turn.`,
@@ -336,7 +337,9 @@ export async function runGandalfPrecheck(input: {
         },
         input.client ? { client: input.client } : {},
       );
-      const keyword = level ? keywordHit(level.keywords, item.content) : undefined;
+      const keyword = level
+        ? keywordHit(level.keywords, item.content)
+        : undefined;
       let outcome: GandalfOutcome;
       if (!judgment.safe) outcome = "rejected";
       else if (keyword) outcome = "held_by_keyword";
@@ -418,8 +421,7 @@ function guardLabel(level: GandalfLevelSummary): string {
 }
 
 function turnLine(turn: GandalfTurnResult): string[] {
-  const score =
-    turn.score === undefined ? "" : `  ${turn.score.toFixed(2)}`;
+  const score = turn.score === undefined ? "" : `  ${turn.score.toFixed(2)}`;
   const verdict = turn.verdict ? `  ${turn.verdict}` : "";
   const categories =
     turn.categories && turn.categories.length > 0
@@ -434,7 +436,8 @@ function turnLine(turn: GandalfTurnResult): string[] {
 }
 
 export function formatGandalfReport(report: GandalfReport): string {
-  const missed = report.attacks.held_by_keyword + report.attacks.reached_defender;
+  const missed =
+    report.attacks.held_by_keyword + report.attacks.reached_defender;
   const lines = [
     `Gandalf pre-check (${report.mode})`,
     `question_set ${report.question_set_version}  policy ${report.policy_version}`,
@@ -457,9 +460,7 @@ export function formatGandalfReport(report: GandalfReport): string {
 
   for (const level of report.levels) {
     const label = level.writeup_password ?? "unsolved in the linked writeup";
-    lines.push(
-      `Level ${level.level}  writeup ${label}  ${guardLabel(level)}`,
-    );
+    lines.push(`Level ${level.level}  writeup ${label}  ${guardLabel(level)}`);
     lines.push(
       `  attacks rejected ${ratio(level.rejected, level.n)}, would reach defender ${level.reached_defender}, keyword hold ${level.held_by_keyword}, errors ${level.errors}`,
     );

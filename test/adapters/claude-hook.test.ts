@@ -51,7 +51,12 @@ function bashInput(
   });
 }
 
-function decisionOf(body: { hookSpecificOutput?: { permissionDecision: string; permissionDecisionReason: string } }) {
+function decisionOf(body: {
+  hookSpecificOutput?: {
+    permissionDecision: string;
+    permissionDecisionReason: string;
+  };
+}) {
   assert.ok(body.hookSpecificOutput);
   return body.hookSpecificOutput;
 }
@@ -134,7 +139,10 @@ describe("claude hook", () => {
 
   it("leaves a non-PreToolUse event alone", async () => {
     const result = await handleClaudeHook(
-      JSON.stringify({ hook_event_name: "beforeShellExecution", command: "echo ok" }),
+      JSON.stringify({
+        hook_event_name: "beforeShellExecution",
+        command: "echo ok",
+      }),
       { config: await config() },
     );
     assert.equal(result.exitCode, 0);

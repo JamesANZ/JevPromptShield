@@ -5,14 +5,20 @@ export {
   resultFromDecision,
   type AnalyzeOptions,
 } from "./analyze.js";
+export { compareDocuments, type CompareOptions } from "./compare.js";
+export { type DocumentJudge } from "./jev/documents.js";
 export { createServer, type ServerOptions } from "./api/server.js";
 export {
+  COMPARE_QUESTION_SET_VERSION,
+  DEFAULT_MATCH_THRESHOLD,
   DEFAULT_THRESHOLDS,
   JEV_INPUT_USD_PER_MILLION,
   MAX_CONTENT_CHARS,
+  MAX_DOCUMENTS,
   PINNED_MODEL,
   POLICY_VERSION,
   QUESTION_SET_VERSION,
+  resolveMatchThreshold,
   resolveThresholds,
 } from "./config.js";
 export { ShieldError, isShieldError, type ShieldErrorCode } from "./errors.js";
@@ -25,6 +31,10 @@ export type { JevDecision } from "./engine/policy.js";
 export type {
   AnalyzeRequest,
   AnalyzeResult,
+  CompareDocument,
+  CompareDocumentResult,
+  CompareRequest,
+  CompareResult,
   Category,
   ContentRole,
   Risk,

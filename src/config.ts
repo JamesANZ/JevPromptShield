@@ -2,6 +2,7 @@ import { ShieldError } from "./errors.js";
 import type { Thresholds } from "./types.js";
 
 export const QUESTION_SET_VERSION = "2026-10-08.2";
+export const COMPARE_QUESTION_SET_VERSION = "2026-10-20.1";
 export const POLICY_VERSION = "2026-10-01.1";
 export const PINNED_MODEL = "jev-1.13.0";
 
@@ -15,6 +16,12 @@ export const JEV_INPUT_USD_PER_MILLION = 0.042;
  */
 export const MAX_CONTENT_CHARS = 100_000;
 export const MAX_CONTEXT_CHARS = 2_000;
+export const MAX_QUESTION_CHARS = 2_000;
+export const MIN_DOCUMENTS = 2;
+export const MAX_DOCUMENTS = 8;
+
+/** A document matches when its probability is at least this value. */
+export const DEFAULT_MATCH_THRESHOLD = 0.5;
 
 export const DEFAULT_THRESHOLDS: Thresholds = {
   suspicious: 0.4,
@@ -58,6 +65,26 @@ export function assertThresholds(thresholds: Thresholds): void {
       "suspicious threshold must be below the malicious threshold.",
     );
   }
+}
+
+export function resolveMatchThreshold(
+  override?: number,
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const value =
+    override ??
+    readUnitInterval(
+      "JEV_SHIELD_COMPARE_THRESHOLD",
+      env.JEV_SHIELD_COMPARE_THRESHOLD,
+    ) ??
+    DEFAULT_MATCH_THRESHOLD;
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    throw new ShieldError(
+      "invalid_request",
+      "match threshold must be a number from 0 to 1.",
+    );
+  }
+  return value;
 }
 
 export function resolveThresholds(

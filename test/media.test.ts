@@ -115,13 +115,11 @@ describe("media transcription", () => {
       /not more than one/,
     );
     assert.throws(
-      () =>
-        prepareMedia("image", { media_type: "image/bmp", data: "AAAA" }),
+      () => prepareMedia("image", { media_type: "image/bmp", data: "AAAA" }),
       /Unsupported image type/,
     );
     assert.throws(
-      () =>
-        prepareMedia("audio", { media_type: "audio/midi", data: "AAAA" }),
+      () => prepareMedia("audio", { media_type: "audio/midi", data: "AAAA" }),
       /Unsupported audio type/,
     );
     assert.throws(
@@ -134,8 +132,7 @@ describe("media transcription", () => {
         error instanceof ShieldError && error.code === "oversize",
     );
     assert.throws(
-      () =>
-        prepareMedia("audio", { media_type: "audio/wav", data: "@@@@" }),
+      () => prepareMedia("audio", { media_type: "audio/wav", data: "@@@@" }),
       /base64/,
     );
   });

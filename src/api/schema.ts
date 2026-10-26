@@ -79,6 +79,100 @@ export function parseAnalyzeBody(raw: unknown, bytes?: number): AnalyzeRequest {
   return request;
 }
 
+export function parseAnalyzeMessageBody(
+  raw: unknown,
+): import("../types.js").AnalyzeMessageRequest {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new ShieldError(
+      "invalid_request",
+      "Request body must be a JSON object.",
+    );
+  }
+  const body = raw as Record<string, unknown>;
+  if (!Array.isArray(body.parts)) {
+    throw new ShieldError("invalid_request", "parts must be an array.");
+  }
+  const request: import("../types.js").AnalyzeMessageRequest = {
+    parts: body.parts.map((part, index) => parseMessagePart(part, index)),
+  };
+  if (body.source !== undefined) {
+    if (
+      typeof body.source !== "string" ||
+      !SOURCES.includes(body.source as Source)
+    ) {
+      throw new ShieldError(
+        "invalid_request",
+        `source must be one of: ${SOURCES.join(", ")}.`,
+      );
+    }
+    request.source = body.source as Source;
+  }
+  if (body.context !== undefined) {
+    if (typeof body.context !== "string") {
+      throw new ShieldError("invalid_request", "context must be a string.");
+    }
+    request.context = body.context;
+  }
+  if (body.thresholds !== undefined) {
+    request.thresholds = parseThresholds(body.thresholds);
+  }
+  return request;
+}
+
+function parseMessagePart(
+  raw: unknown,
+  index: number,
+): import("../types.js").MessagePart {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new ShieldError(
+      "invalid_request",
+      `Message part ${index + 1} must be an object.`,
+    );
+  }
+  const body = raw as Record<string, unknown>;
+  let source: Source | undefined;
+  if (body.source !== undefined) {
+    if (
+      typeof body.source !== "string" ||
+      !SOURCES.includes(body.source as Source)
+    ) {
+      throw new ShieldError(
+        "invalid_request",
+        `Message part ${index + 1} source must be one of: ${SOURCES.join(", ")}.`,
+      );
+    }
+    source = body.source as Source;
+  }
+  const common = source === undefined ? {} : { source };
+  if (body.type === "text") {
+    if (typeof body.content !== "string") {
+      throw new ShieldError(
+        "invalid_request",
+        `Message part ${index + 1} content must be a string.`,
+      );
+    }
+    return { ...common, type: "text", content: body.content };
+  }
+  if (body.type === "image") {
+    return {
+      ...common,
+      type: "image",
+      image: parseAttachment("image", body.image),
+    };
+  }
+  if (body.type === "audio") {
+    return {
+      ...common,
+      type: "audio",
+      audio: parseAttachment("audio", body.audio),
+    };
+  }
+  throw new ShieldError(
+    "invalid_request",
+    `Message part ${index + 1} must have type text, image, or audio.`,
+  );
+}
+
 export function parseCompareBody(raw: unknown, bytes?: number): CompareRequest {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
     throw new ShieldError(

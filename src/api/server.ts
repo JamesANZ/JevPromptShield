@@ -5,12 +5,18 @@ import {
 } from "node:http";
 import { QUESTION_SET_VERSION, POLICY_VERSION } from "../config.js";
 import { analyze } from "../analyze.js";
+import { analyzeMessage } from "../message.js";
 import { compareDocuments } from "../compare.js";
 import { isShieldError } from "../errors.js";
 import type { JevClient } from "../jev/client.js";
 import type { DocumentJudge } from "../jev/documents.js";
 import type { MediaTranscriber } from "../media/transcribe.js";
-import { parseAnalyzeBody, parseCompareBody, readJsonBody } from "./schema.js";
+import {
+  parseAnalyzeBody,
+  parseAnalyzeMessageBody,
+  parseCompareBody,
+  readJsonBody,
+} from "./schema.js";
 
 export interface ServerOptions {
   client?: JevClient;
@@ -54,7 +60,11 @@ export function createServer(options: ServerOptions = {}) {
         });
         return;
       }
-      if (url.pathname !== "/v1/analyze" && url.pathname !== "/v1/compare") {
+      if (
+        url.pathname !== "/v1/analyze" &&
+        url.pathname !== "/v1/analyze-message" &&
+        url.pathname !== "/v1/compare"
+      ) {
         sendJson(res, 404, {
           error: { code: "invalid_request", message: "Not found." },
         });
@@ -71,6 +81,15 @@ export function createServer(options: ServerOptions = {}) {
         const body = parseCompareBody(uploaded.value, uploaded.bytes);
         const result = await compareDocuments(body, {
           ...(options.judge ? { judge: options.judge } : {}),
+          ...(options.transcriber ? { transcriber: options.transcriber } : {}),
+        });
+        sendJson(res, 200, result);
+        return;
+      }
+      if (url.pathname === "/v1/analyze-message") {
+        const body = parseAnalyzeMessageBody(uploaded.value);
+        const result = await analyzeMessage(body, {
+          ...(options.client ? { client: options.client } : {}),
           ...(options.transcriber ? { transcriber: options.transcriber } : {}),
         });
         sendJson(res, 200, result);

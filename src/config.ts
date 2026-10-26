@@ -19,6 +19,7 @@ export const MAX_CONTEXT_CHARS = 2_000;
 export const MAX_QUESTION_CHARS = 2_000;
 export const MIN_DOCUMENTS = 2;
 export const MAX_DOCUMENTS = 8;
+export const MAX_MESSAGE_PARTS = 16;
 
 /** A document matches when its probability is at least this value. */
 export const DEFAULT_MATCH_THRESHOLD = 0.5;

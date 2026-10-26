@@ -6,6 +6,7 @@ export {
   type AnalyzeOptions,
 } from "./analyze.js";
 export { compareDocuments, type CompareOptions } from "./compare.js";
+export { analyzeMessage } from "./message.js";
 export { type DocumentJudge } from "./jev/documents.js";
 export { createServer, type ServerOptions } from "./api/server.js";
 export {
@@ -15,6 +16,7 @@ export {
   JEV_INPUT_USD_PER_MILLION,
   MAX_CONTENT_CHARS,
   MAX_DOCUMENTS,
+  MAX_MESSAGE_PARTS,
   PINNED_MODEL,
   POLICY_VERSION,
   QUESTION_SET_VERSION,
@@ -29,6 +31,9 @@ export {
 } from "./jev/client.js";
 export type { JevDecision } from "./engine/policy.js";
 export type {
+  AnalyzeMessagePartResult,
+  AnalyzeMessageRequest,
+  AnalyzeMessageResult,
   AnalyzeRequest,
   AnalyzeResult,
   CompareDocument,
@@ -37,6 +42,7 @@ export type {
   CompareResult,
   Category,
   ContentRole,
+  MessagePart,
   Risk,
   Signal,
   Source,

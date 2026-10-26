@@ -64,6 +64,41 @@ export interface AnalyzeRequest {
   thresholds?: Partial<Thresholds>;
 }
 
+export type MessagePart = { source?: Source } & (
+  | { type: "text"; content: string }
+  | { type: "image"; image: MediaAttachment }
+  | { type: "audio"; audio: MediaAttachment }
+);
+
+export interface AnalyzeMessageRequest {
+  parts: MessagePart[];
+  source?: Source;
+  context?: string;
+  thresholds?: Partial<Thresholds>;
+}
+
+export interface AnalyzeMessagePartResult {
+  index: number;
+  type: MessagePart["type"];
+  source: Source;
+  result: AnalyzeResult;
+}
+
+export interface AnalyzeMessageResult {
+  safe: boolean;
+  verdict: Verdict;
+  risk: Risk;
+  score: number;
+  categories: Category[];
+  reason: string;
+  parts: AnalyzeMessagePartResult[];
+  model: string;
+  usage: Usage;
+  latency_ms: number;
+  policy_version: string;
+  question_set_version: string;
+}
+
 /** One attachment in a comparison. Exactly one of content, image, or audio. */
 export interface CompareDocument {
   id?: string;

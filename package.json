@@ -1,22 +1,45 @@
 {
   "name": "jev-shield",
   "version": "0.1.0",
-  "private": true,
-  "description": "Checks actions proposed by AI coding agents before they reach privileged tools, and scores untrusted text for prompt injection with TypeSafe Jev.",
+  "description": "Multimodal prompt-injection scanning and enforcement for LLM clients, MCP, Claude Code, and OpenAI-compatible applications.",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JamesANZ/JevPromptShield.git"
+  },
+  "keywords": [
+    "prompt-injection",
+    "llm-security",
+    "mcp",
+    "claude-code",
+    "multimodal"
+  ],
   "engines": {
     "node": ">=20"
   },
   "bin": {
     "jev-shield": "./dist/src/cli.js"
   },
+  "types": "./dist/src/index.d.ts",
   "exports": {
-    ".": "./dist/src/index.js"
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    }
   },
+  "files": [
+    "dist/src",
+    "corpus",
+    "docs",
+    ".env.example"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "tsc && find dist/test -name '*.test.js' -exec node --test {} +",
+    "test:package": "node scripts/test-package.mjs",
+    "prepack": "npm run build",
     "start": "node dist/src/cli.js serve",
     "jev-shield": "node dist/src/cli.js"
   },

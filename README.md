@@ -71,7 +71,16 @@ The Bash gate follows the pattern in [Using Jev to guard AI coding agents agains
 
 ## Install
 
-Node.js 20 or newer.
+Node.js 20 or newer. For a published npm release, install the CLI globally or the library in an application:
+
+```bash
+npm install --global jev-shield
+# Or, in a Node.js application:
+npm install jev-shield
+export TYPESAFE_API_KEY=...
+```
+
+To build this checkout instead:
 
 ```bash
 npm install
@@ -80,7 +89,7 @@ npm run build
 export TYPESAFE_API_KEY=...
 ```
 
-The package binary is `jev-shield` (`./dist/src/cli.js`). After `npm link`, or an install that puts `node_modules/.bin` on your PATH, the commands below work as `jev-shield`. From this checkout, run `node dist/src/cli.js` in their place.
+The package binary is `jev-shield` (`./dist/src/cli.js`). After `npm link`, or an install that puts `node_modules/.bin` on your PATH, the commands below work as `jev-shield`. From this checkout, run `node dist/src/cli.js` in their place. `npm pack` builds the publish artifact, and `npm run test:package` verifies its whitelist, installs the tarball into an isolated directory, imports the public API, and runs the packaged CLI.
 
 ## Claude Code
 
@@ -105,7 +114,7 @@ node dist/src/cli.js doctor
 node dist/src/cli.js test
 ```
 
-`doctor` checks Node, the CLI file, that a TypeSafe key is available without printing it, that the prompt, Bash, and tool-content hook entries exist, and that the audit log can be appended. It also prints `claude --version` when the binary is on PATH. `test` runs fixture commands through the local policy and a mock Jev. It does not call the network.
+`doctor` checks Node, the CLI file, provider-key availability without printing secrets, media and proxy configuration, the prompt, Bash, and tool-content hook entries, and that the audit log can be appended. It also prints `claude --version` when the binary is on PATH. Ordinary checks do not call the network. `node dist/src/cli.js doctor --live` explicitly makes small TypeSafe, OpenAI OCR, and speech requests to verify real credentials and connectivity; those provider calls can incur charges. `test` runs fixture commands through the local policy and a mock Jev.
 
 The Bash hook is the absolute path to this Node binary plus `hook claude`, with a 15 second host timeout. The Jev action call itself is capped at 2.5 seconds, with no retries, so a slow response becomes ASK or BLOCK inside the process. The hook always exits 0 and prints one JSON object. Claude Code treats other exit codes as non-blocking, which would let the command run.
 
@@ -126,6 +135,12 @@ Action-gate settings are environment variables. See [.env.example](.env.example)
 The content scorer uses `JEV_SHIELD_SUSPICIOUS_THRESHOLD` and `JEV_SHIELD_MALICIOUS_THRESHOLD`. Image and audio transcription use `OPENAI_API_KEY`. `JEV_SHIELD_VISION_MODEL` defaults to `gpt-4o-mini`, `JEV_SHIELD_TRANSCRIBE_MODEL` defaults to `whisper-1`, and `JEV_SHIELD_TRANSCRIBE_TIMEOUT_MS` defaults to `30000`.
 
 Shield sends Jev a redacted command, the working directory, the git branch name when `git rev-parse` succeeds, the environment class, the tool name, and the agent's description marked as untrusted. It does not send environment variables, credentials, file contents, or the transcript. The same redaction is applied to the audit log. Credential-shaped substrings are replaced with `[redacted]`.
+
+## Data flow and privacy
+
+Content analysis sends the submitted text, its source, and caller-supplied context to TypeSafe Jev. Normalized or decoded inspection forms are sent too. Images and audio are sent to OpenAI for transcription, and the resulting transcript is then sent to Jev. Do not scan material that your provider agreements or data policy do not permit you to disclose. API keys stay in server-side environment or client configuration and are not included in verdicts or doctor output.
+
+The guarded OpenAI proxy scans user and tool content, then forwards allowed chat requests to the configured upstream. Trusted system and developer messages are not sent to Jev, but they are forwarded upstream as part of an allowed request. Claude action-gate audit records stay in the local append-only log and contain redacted action metadata, not scanned file contents or media transcripts. Shield is not a sandbox, and an allowed request still uses the downstream model and tools you configure.
 
 ## What a command does
 

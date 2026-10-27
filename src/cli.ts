@@ -149,6 +149,7 @@ async function runGateCommand(command: string): Promise<void> {
     options: {
       project: { type: "boolean", default: false },
       settings: { type: "string" },
+      live: { type: "boolean", default: false },
     },
     strict: true,
   });
@@ -185,6 +186,7 @@ async function runGateCommand(command: string): Promise<void> {
       settingsPath,
       cliPath: fileURLToPath(import.meta.url),
       claudeVersion: await commandVersion("claude"),
+      live: values.live,
     });
     process.stdout.write(formatDoctor(report.checks));
     if (!report.ok) fail("Doctor found a problem.", 1);
@@ -309,7 +311,7 @@ async function main(): Promise<void> {
   const { values } = await readFlags();
   if (command === "help" || command === "--help" || command === "-h") {
     process.stdout.write(`jev-shield setup claude [--project] [--settings path]
-jev-shield doctor [--project] [--settings path]
+jev-shield doctor [--project] [--settings path] [--live]
 jev-shield test
 jev-shield hook claude
 jev-shield hook prompt

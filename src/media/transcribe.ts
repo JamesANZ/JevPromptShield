@@ -1,6 +1,7 @@
 import { extname } from "node:path";
 import { ShieldError } from "../errors.js";
 import type { MediaAttachment } from "../types.js";
+import { validateMedia } from "./validate.js";
 
 /** Decoded image or audio cap. Shield does not truncate. */
 export const MAX_MEDIA_BYTES = 10 * 1024 * 1024;
@@ -171,10 +172,10 @@ export function prepareMedia(
       `${kind}.data must be base64 or bytes.`,
     );
   }
-  return {
-    mediaType: canonicalMediaType(kind, raw.media_type),
-    bytes: mediaBytes(raw.data),
-  };
+  const mediaType = canonicalMediaType(kind, raw.media_type);
+  const bytes = mediaBytes(raw.data);
+  validateMedia(kind, mediaType, bytes);
+  return { mediaType, bytes };
 }
 
 function transcribeTimeoutMs(env: NodeJS.ProcessEnv): number {

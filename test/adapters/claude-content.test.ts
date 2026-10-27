@@ -5,6 +5,7 @@ import {
   handleClaudeContentOutput,
 } from "../../src/adapters/claude/content.js";
 import { decisionFromScores } from "../../src/jev/client.js";
+import { pngBase64 } from "../media-data.js";
 
 function options(seen: string[] = []) {
   return {
@@ -101,7 +102,7 @@ describe("Claude tool-content hooks", () => {
         tool_name: "mcp__browser__screenshot",
         tool_response: {
           content: [
-            { type: "image", media_type: "image/png", data: "AAAA" },
+            { type: "image", media_type: "image/png", data: pngBase64 },
           ],
         },
       }),

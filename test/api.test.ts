@@ -7,6 +7,7 @@ import { ShieldError } from "../src/errors.js";
 import { decisionFromScores, type JevClient } from "../src/jev/client.js";
 import type { DocumentJudge } from "../src/jev/documents.js";
 import type { MediaTranscriber } from "../src/media/transcribe.js";
+import { pngBase64 } from "./media-data.js";
 
 function listen(
   client: JevClient,
@@ -135,7 +136,7 @@ describe("http", () => {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          image: { media_type: "image/png", data: "AAAA" },
+          image: { media_type: "image/png", data: pngBase64 },
           source: "webpage",
         }),
       });

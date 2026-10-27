@@ -208,7 +208,9 @@ const fromAudio = await jevShield.analyzeAudio(
 );
 ```
 
-`image.data` and `audio.data` are raw bytes in process, or standard base64 on `POST /v1/analyze`. Images are png, jpeg, gif, or webp. Audio is mp3, wav, webm, mp4, m4a, ogg, or flac. Either attachment is rejected above 10 MB. A transcription failure is `transcription_error` and is never reported as safe. Empty text from the image, or empty speech from the audio, is rejected the same way as empty `content`.
+`image.data` and `audio.data` are raw bytes in process, or standard base64 on `POST /v1/analyze`. Images are png, jpeg, gif, or webp. Audio is mp3, wav, webm, mp4, m4a, ogg, or flac. Shield validates file signatures and structure against the declared type rather than trusting the MIME label. Either attachment is rejected above 10 MB. Images are limited to 16,384 pixels per side and 40 million total pixels. Audio is limited to 300 seconds; when a container does not expose a reliable duration, Shield applies a conservative compressed-size bound instead. A transcription failure is `transcription_error` and is never reported as safe. Empty text from the image, or empty speech from the audio, is deliberately rejected rather than treated as safe, because an unreadable attack must not become a bypass.
+
+The committed PNG, JPEG, and spoken WAV fixtures in `test/fixtures/` cover benign and injection content through the complete local analysis path. Provider transcription is mocked in routine tests, so these tests validate real media handling and enforcement, not the current accuracy of OpenAI OCR or speech recognition.
 
 ```bash
 node dist/src/cli.js analyze --source webpage --file page.txt

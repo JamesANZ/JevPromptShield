@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { analyze } from "../src/analyze.js";
 import { ShieldError } from "../src/errors.js";
 import { decisionFromScores, type JevClient } from "../src/jev/client.js";
+import { jpegBytes, pngBase64, pngBytes, wavBytes } from "./media-data.js";
 import {
   MAX_MEDIA_BYTES,
   createOpenAiMediaTranscriber,
@@ -41,7 +42,7 @@ describe("media transcription", () => {
     const seen: string[] = [];
     const result = await analyze(
       {
-        image: { media_type: "image/png", data: "AAAA" },
+        image: { media_type: "image/png", data: pngBytes },
         source: "webpage",
       },
       {
@@ -58,7 +59,7 @@ describe("media transcription", () => {
     const seen: string[] = [];
     const result = await analyze(
       {
-        audio: { media_type: "audio/wav", data: new Uint8Array([1, 2, 3]) },
+        audio: { media_type: "audio/wav", data: wavBytes },
         source: "user",
       },
       {
@@ -82,7 +83,7 @@ describe("media transcription", () => {
     await assert.rejects(
       () =>
         analyze(
-          { image: { media_type: "image/jpeg", data: "AAAA" } },
+          { image: { media_type: "image/jpeg", data: jpegBytes } },
           { client: probe, transcriber: transcriber("   ", "") },
         ),
       (error: unknown) =>
@@ -93,7 +94,7 @@ describe("media transcription", () => {
     await assert.rejects(
       () =>
         analyze(
-          { audio: { media_type: "audio/mpeg", data: "AAAA" } },
+          { audio: { media_type: "audio/wav", data: wavBytes } },
           { client: probe, transcriber: transcriber("", "") },
         ),
       (error: unknown) =>
@@ -108,7 +109,7 @@ describe("media transcription", () => {
         analyze(
           {
             content: "hello",
-            image: { media_type: "image/png", data: "AAAA" },
+            image: { media_type: "image/png", data: pngBase64 },
           },
           { transcriber: transcriber("x", "y") },
         ),
@@ -167,10 +168,10 @@ describe("media transcription", () => {
       fetch: fetchImpl,
     });
     const image = await live.transcribeImage(
-      prepareMedia("image", { media_type: "image/png", data: "AAAA" }),
+      prepareMedia("image", { media_type: "image/png", data: pngBytes }),
     );
     const audio = await live.transcribeAudio(
-      prepareMedia("audio", { media_type: "audio/mpeg", data: "AAAA" }),
+      prepareMedia("audio", { media_type: "audio/wav", data: wavBytes }),
     );
     assert.equal(image, "text in the image");
     assert.equal(audio, "spoken words");
@@ -191,7 +192,7 @@ describe("media transcription", () => {
     await assert.rejects(
       () =>
         blocked.transcribeImage(
-          prepareMedia("image", { media_type: "image/gif", data: "AAAA" }),
+          prepareMedia("image", { media_type: "image/png", data: pngBytes }),
         ),
       (error: unknown) =>
         error instanceof ShieldError && error.code === "transcription_error",
@@ -211,7 +212,7 @@ describe("media transcription", () => {
     await assert.rejects(
       () =>
         transcriber.transcribeAudio(
-          prepareMedia("audio", { media_type: "audio/ogg", data: "AAAA" }),
+          prepareMedia("audio", { media_type: "audio/wav", data: wavBytes }),
         ),
       (error: unknown) =>
         error instanceof ShieldError &&

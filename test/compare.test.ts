@@ -15,6 +15,7 @@ import {
 import { ShieldError } from "../src/errors.js";
 import type { DocumentJudge } from "../src/jev/documents.js";
 import type { MediaTranscriber } from "../src/media/transcribe.js";
+import { pngBytes, wavBytes } from "./media-data.js";
 
 function judge(
   scores: number[],
@@ -86,11 +87,11 @@ describe("compare documents", () => {
         documents: [
           {
             name: "page.png",
-            image: { media_type: "image/png", data: "AAAA" },
+            image: { media_type: "image/png", data: pngBytes },
           },
           {
-            name: "memo.mp3",
-            audio: { media_type: "audio/mpeg", data: new Uint8Array([1, 2]) },
+            name: "memo.wav",
+            audio: { media_type: "audio/wav", data: wavBytes },
           },
         ],
       },
@@ -113,7 +114,7 @@ describe("compare documents", () => {
       "Gerald signed the clinic intake form.",
       "This recording is about annual health checks.",
     ]);
-    assert.equal(result.matches[0]?.name, "memo.mp3");
+    assert.equal(result.matches[0]?.name, "memo.wav");
     assert.equal(
       result.documents[0]?.transcript,
       "Gerald signed the clinic intake form.",

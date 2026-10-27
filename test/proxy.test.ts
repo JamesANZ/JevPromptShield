@@ -7,6 +7,7 @@ import {
   type OpenAiProxyOptions,
 } from "../src/proxy.js";
 import { decisionFromScores } from "../src/jev/client.js";
+import { pngBase64, wavBase64 } from "./media-data.js";
 
 async function listen(options: Partial<OpenAiProxyOptions> = {}) {
   const upstreamCalls: { url: string; body: string; auth: string | null }[] = [];
@@ -74,11 +75,11 @@ describe("guarded OpenAI-compatible proxy", () => {
             { type: "text", text: "Read these ordinary attachments" },
             {
               type: "image_url",
-              image_url: { url: "data:image/png;base64,AAAA" },
+              image_url: { url: `data:image/png;base64,${pngBase64}` },
             },
             {
               type: "input_audio",
-              input_audio: { data: "AAAA", format: "wav" },
+              input_audio: { data: wavBase64, format: "wav" },
             },
           ],
         },
@@ -113,7 +114,7 @@ describe("guarded OpenAI-compatible proxy", () => {
           content: [
             {
               type: "image_url",
-              image_url: { url: "data:image/png;base64,AAAA" },
+              image_url: { url: `data:image/png;base64,${pngBase64}` },
             },
           ],
         },
@@ -165,7 +166,7 @@ describe("guarded OpenAI-compatible proxy", () => {
           content: [
             {
               type: "image_url",
-              image_url: { url: "data:image/png;base64,AAAA" },
+              image_url: { url: `data:image/png;base64,${pngBase64}` },
             },
           ],
         },

@@ -4,6 +4,7 @@ import { analyzeMessage } from "../src/message.js";
 import { ShieldError } from "../src/errors.js";
 import { decisionFromScores, type JevClient } from "../src/jev/client.js";
 import type { MediaTranscriber } from "../src/media/transcribe.js";
+import { pngBytes, wavBytes } from "./media-data.js";
 
 function client(scores: number[], seen: { content: string; source: string }[]) {
   let index = 0;
@@ -41,11 +42,11 @@ describe("analyzeMessage", () => {
           {
             type: "image",
             source: "webpage",
-            image: { media_type: "image/png", data: "AAAA" },
+            image: { media_type: "image/png", data: pngBytes },
           },
           {
             type: "audio",
-            audio: { media_type: "audio/wav", data: new Uint8Array([1]) },
+            audio: { media_type: "audio/wav", data: wavBytes },
           },
         ],
       },

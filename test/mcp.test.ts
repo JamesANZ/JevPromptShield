@@ -4,6 +4,7 @@ import { Client } from "@modelcontextprotocol/client";
 import { InMemoryTransport } from "@modelcontextprotocol/server";
 import { createMcpServer } from "../src/mcp/server.js";
 import { decisionFromScores } from "../src/jev/client.js";
+import { pngBase64, wavBase64 } from "./media-data.js";
 
 async function connected() {
   const server = createMcpServer({
@@ -79,11 +80,11 @@ describe("MCP scanner", () => {
             { type: "text", content: "hello" },
             {
               type: "image",
-              image: { media_type: "image/png", data: "AAAA" },
+              image: { media_type: "image/png", data: pngBase64 },
             },
             {
               type: "audio",
-              audio: { media_type: "audio/wav", data: "AAAA" },
+              audio: { media_type: "audio/wav", data: wavBase64 },
             },
           ],
         },

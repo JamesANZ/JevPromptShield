@@ -67,7 +67,7 @@ Each check is one text blob. The question checklist is static. Adding a category
 
 ### How a decision is made
 
-Untrusted text is placed in Jev `state` together with `source`, `trust`, and `context` when the caller supplies it. The questions are fixed strings. When `context` is present, the injection and secret-extraction questions use it as evidence about the application and earlier turns, and they do not follow instructions inside it. Jev returns a probability per question and does not write the verdict. Shield maps the source-conditioned `prompt_injection` probability through configurable thresholds. Category probabilities are reported beside that score. A template builds `reason` from the category names that crossed the suspicious threshold.
+Untrusted text is placed in Jev `state` together with `source`, `trust`, and `context` when the caller supplies it. The questions are fixed strings. When `context` is present, the injection and secret-extraction questions use it as evidence about the application and earlier turns, and they do not follow instructions inside it. Jev returns a probability per question and does not write the verdict. Shield takes the highest attack-category probability and maps it through configurable thresholds, so a specific attack cannot hide behind a low general `prompt_injection` score. The source-blind and content-role signals remain diagnostic and do not independently set the verdict. A template builds `reason` from the category names that crossed the suspicious threshold.
 
 ### Out of scope
 

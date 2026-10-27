@@ -17,7 +17,7 @@ Per-tag rates use the same rule inside each tag. Encoded and multilingual tags a
 ## Other numbers in the report
 
 - `source_blind` scores the same rows with the question that ignores `source`, `trust`, and `context`.
-- `category_union` flags a row when any attack-category probability crosses the suspicious threshold, including rows the primary score would pass.
+- `category_union` flags a row when any attack-category probability crosses the suspicious threshold. This is also the production verdict policy as of policy version `2026-10-27.1`; the diagnostic remains useful when comparing older reports.
 - `detection_threshold_sweep` shows precision, recall, and false-positive rate from 0.05 to 0.95.
 - Latency is the nearest-rank p50 and p95 of live Shield calls. Eval calls are sequential.
 - Cost per 1,000 requests is the mean `input_tokens` times the published Jev input price of $0.042 per million tokens. Fixture mode leaves latency and cost empty.
@@ -39,3 +39,5 @@ Rows that throw are listed under `errors` and stay out of the confusion matrix. 
 ## Live runs
 
 `TYPESAFE_API_KEY` is required for a live eval. With no key and no `--fixture` file, the command exits 2 and writes nothing. Do not fill `eval/results/` with guessed scores. The Gandalf command uses the same rule.
+
+The default thresholds are configurable conservative defaults, not a claim of live calibration. Use `detection_threshold_sweep` on the dev split to choose them, record the policy version and metrics, then evaluate the untouched test split once. A mocked test run does not establish real-world precision or recall.

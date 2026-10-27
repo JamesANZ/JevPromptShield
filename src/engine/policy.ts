@@ -77,7 +77,8 @@ export function applyPolicy(
   }
   assertScore(SOURCE_BLIND_SIGNAL, decision.scores[SOURCE_BLIND_SIGNAL]);
 
-  const score = decision.scores.prompt_injection;
+  // A specific attack must not hide behind a low general injection score.
+  const score = Math.max(...CATEGORIES.map((category) => decision.scores[category]));
   let verdict: Verdict;
   let risk: Risk;
   if (score >= thresholds.malicious) {

@@ -29,7 +29,7 @@ export const CONTENT_ROLES = [
 
 export type ContentRole = (typeof CONTENT_ROLES)[number];
 
-/** Attack signals. `prompt_injection` is also the primary score. */
+/** Attack signals. Policy uses the highest category score; `prompt_injection` is the general signal. */
 export const CATEGORIES = [
   "prompt_injection",
   "instruction_override",

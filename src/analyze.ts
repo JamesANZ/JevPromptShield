@@ -5,6 +5,10 @@ import {
 } from "./config.js";
 import { isShieldError, ShieldError } from "./errors.js";
 import { applyPolicy, type JevDecision } from "./engine/policy.js";
+import {
+  inspectionVariants,
+  transformationLabel,
+} from "./engine/transform.js";
 import { createLiveJevClient, type JevClient } from "./jev/client.js";
 import {
   createOpenAiMediaTranscriber,
@@ -140,14 +144,54 @@ export async function analyze(
   const thresholds = resolveThresholds(request.thresholds);
   const client = options?.client ?? createLiveJevClient();
   const started = performance.now();
-  const decision = await client.decide(normalized);
-  const result = resultFromDecision(
-    decision,
-    thresholds,
-    performance.now() - started,
-  );
-  if (submitted.transcript === undefined) return result;
-  return { ...result, transcript: submitted.transcript };
+  const variants = inspectionVariants(normalized.content);
+  const results: AnalyzeResult[] = [];
+  let selected = 0;
+  const severity = { safe: 0, suspicious: 1, malicious: 2 } as const;
+
+  for (const [index, variant] of variants.entries()) {
+    const decision = await client.decide({
+      ...normalized,
+      content: variant.content,
+    });
+    const result = resultFromDecision(decision, thresholds, 0);
+    results.push(result);
+    const current = results[selected];
+    if (
+      current &&
+      (severity[result.verdict] > severity[current.verdict] ||
+        (result.verdict === current.verdict && result.score > current.score))
+    ) {
+      selected = index;
+    }
+  }
+
+  const selectedResult = results[selected];
+  if (!selectedResult) {
+    throw new ShieldError("jev_error", "No content variant could be scored.");
+  }
+  const result: AnalyzeResult = {
+    ...selectedResult,
+    usage: results.reduce(
+      (usage, item) => ({
+        input_tokens: usage.input_tokens + item.usage.input_tokens,
+        output_tokens: usage.output_tokens + item.usage.output_tokens,
+        estimated_cost_usd:
+          usage.estimated_cost_usd + item.usage.estimated_cost_usd,
+      }),
+      { input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 },
+    ),
+    latency_ms: performance.now() - started,
+    examined_transformations: variants.map((variant) =>
+      transformationLabel(variant.transformations),
+    ),
+  };
+  const matched = variants[selected];
+  if (matched && matched.transformations.length > 0) {
+    result.matched_transformation = transformationLabel(matched.transformations);
+  }
+  if (submitted.transcript !== undefined) result.transcript = submitted.transcript;
+  return result;
 }
 
 export const jevShield = {

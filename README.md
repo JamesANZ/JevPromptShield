@@ -179,6 +179,8 @@ The content-scoring threat model is the second half of [docs/threat-model.md](do
 
 `jev-shield analyze` and `POST /v1/analyze` use the same content score as the prompt hook. Jev answers a fixed checklist and returns a probability per question. Thresholds in ordinary code map that score to `safe`, `suspicious`, or `malicious`. A Jev failure throws and is never reported as safe.
 
+Shield also inspects bounded normalized and decoded forms alongside the original: Unicode compatibility and common lookalike normalization, invisible-character removal, and printable Base64, hexadecimal, and URL decoding. It examines at most twelve forms with at most two nested transformations, and the highest-severity verdict wins. `matched_transformation` identifies a transformed match without copying decoded content into diagnostic metadata. These checks improve inspection coverage; they do not make arbitrary encoding or multilingual attacks decidable.
+
 Pass `context` when the surrounding application matters. A short question can be an ordinary task in one product and an attempt to spell out a secret in another. The Gandalf run above is that difference, measured.
 
 ```ts

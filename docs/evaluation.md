@@ -12,7 +12,7 @@ The hand-labeled corpus in `corpus/cases.jsonl` is the headline set. One JSON ob
 
 `malicious` is the positive class. `safe` is the negative class. `suspicious` rows are excluded from precision, recall, false-positive rate, and false-negative rate, and they still count toward verdict agreement. A detection is a predicted verdict of `suspicious` or `malicious`. The strict cut counts only `malicious`.
 
-Per-tag rates use the same rule inside each tag. Encoded and multilingual tags are there so a weak class stays visible. Encoded cases are scored as written. Shield does not decode them first.
+Per-tag rates use the same rule inside each tag. Encoded and multilingual tags are there so a weak class stays visible. Shield scores the original text and a bounded set of normalized or decoded inspection forms. It applies NFKC normalization, removes invisible directionality controls, folds common Cyrillic and Greek lookalikes, and decodes printable Base64, hexadecimal, and URL-encoded text. Recursion is limited to two transformations and twelve total forms, including the original. The highest-severity verdict wins, so a decoded attack cannot be hidden by a safe score on the encoded text.
 
 ## Other numbers in the report
 

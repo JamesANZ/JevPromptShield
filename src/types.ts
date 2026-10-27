@@ -169,4 +169,8 @@ export interface AnalyzeResult {
    * Omitted for ordinary text requests.
    */
   transcript?: string;
+  /** Applied when a normalized or decoded form produced the selected verdict. */
+  matched_transformation?: string;
+  /** Labels only; decoded content is never copied into this diagnostic field. */
+  examined_transformations?: string[];
 }

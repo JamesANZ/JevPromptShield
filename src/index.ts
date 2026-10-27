@@ -9,6 +9,7 @@ export { compareDocuments, type CompareOptions } from "./compare.js";
 export { analyzeMessage } from "./message.js";
 export { type DocumentJudge } from "./jev/documents.js";
 export { createServer, type ServerOptions } from "./api/server.js";
+export { createMcpServer, startMcpServer } from "./mcp/server.js";
 export {
   COMPARE_QUESTION_SET_VERSION,
   DEFAULT_MATCH_THRESHOLD,

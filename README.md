@@ -217,6 +217,29 @@ node dist/src/cli.js gandalf
 
 `source` defaults to `unknown`, which is judged as untrusted data. Pass the real source: `user`, `webpage`, `pdf`, `email`, `rag`, `tool`, `mcp`, `agent`, `database`, or `unknown`. The pinned model is `jev-1.13.0`. The published direct-API price used for the cost figure is $0.042 per million input tokens. Output tokens are free. Confirm the current price before you budget from it.
 
+## Mixed messages and MCP
+
+`analyzeMessage` and `POST /v1/analyze-message` accept one to sixteen `parts`. Each part is `text`, `image`, or `audio`, and can override the message-level `source` so pasted or retrieved material remains distinguishable from the user's own request. Every part is analyzed. The response contains each verdict and an aggregate that is unsafe when any part is unsafe. A transcription or Jev error rejects the request rather than producing an aggregate `safe` result.
+
+`jev-shield mcp` serves the same scanner over MCP stdio. It exposes `analyze_text`, `analyze_image`, `analyze_audio`, and `analyze_message`. Media is standard base64. Configure an MCP client with an absolute CLI path, for example:
+
+```json
+{
+  "mcpServers": {
+    "jev-shield": {
+      "command": "node",
+      "args": ["/absolute/path/to/jev-shield/dist/src/cli.js", "mcp"],
+      "env": {
+        "TYPESAFE_API_KEY": "...",
+        "OPENAI_API_KEY": "..."
+      }
+    }
+  }
+}
+```
+
+The MCP tools are scanners, not an enforcement boundary. A client or application must enforce an unsafe verdict before passing the content to a model. Use native hooks or middleware when prevention must not depend on the model choosing to call a tool.
+
 ## Compare documents
 
 `jev-shield compare` and `POST /v1/compare` take one question and two to eight documents. Jev scores each document in a single call, so the documents can be compared with each other. A document matches when its probability is at least `0.5` (`JEV_SHIELD_COMPARE_THRESHOLD`, or `threshold` on the request). More than one document can match. The result lists every attachment in the order it was sent, and `matches` lists the ones that qualified, highest score first.

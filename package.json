@@ -21,9 +21,12 @@
     "jev-shield": "node dist/src/cli.js"
   },
   "dependencies": {
-    "@typesafe-ai/sdk": "^0.6.0"
+    "@modelcontextprotocol/server": "^2.4.0",
+    "@typesafe-ai/sdk": "^0.6.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
     "@types/node": "^26.6.3",
     "typescript": "^7.0.2"
   }

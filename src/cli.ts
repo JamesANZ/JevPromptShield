@@ -21,6 +21,7 @@ import { runSelfCheck } from "./enforcement/self-check.js";
 import { analyze } from "./analyze.js";
 import { compareDocuments } from "./compare.js";
 import { createServer } from "./api/server.js";
+import { startMcpServer } from "./mcp/server.js";
 import { isShieldError, ShieldError } from "./errors.js";
 import { attachmentKind, mediaTypeForFilename } from "./media/transcribe.js";
 import { loadCorpus } from "./eval/corpus.js";
@@ -275,6 +276,10 @@ async function main(): Promise<void> {
     await runGateCommand(command);
     return;
   }
+  if (command === "mcp") {
+    await startMcpServer();
+    return;
+  }
   if (command === "compare") {
     await runCompare();
     return;
@@ -286,6 +291,7 @@ jev-shield doctor [--project] [--settings path]
 jev-shield test
 jev-shield hook claude
 jev-shield hook prompt
+jev-shield mcp
 jev-shield analyze --source webpage --file page.txt
 jev-shield analyze --source user --content "text"
 jev-shield analyze --source webpage --image shot.png

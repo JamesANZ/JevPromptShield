@@ -21,6 +21,7 @@ import { runSelfCheck } from "./enforcement/self-check.js";
 import { analyze } from "./analyze.js";
 import { compareDocuments } from "./compare.js";
 import { createServer } from "./api/server.js";
+import { createOpenAiProxyServer } from "./proxy.js";
 import { startMcpServer } from "./mcp/server.js";
 import { isShieldError, ShieldError } from "./errors.js";
 import { attachmentKind, mediaTypeForFilename } from "./media/transcribe.js";
@@ -298,6 +299,7 @@ jev-shield analyze --source webpage --image shot.png
 jev-shield analyze --source user --audio note.mp3
 jev-shield compare --question "Which document mentions Gerald?" notes.txt clinic.txt
 jev-shield serve [--port 8787] [--host 127.0.0.1]
+jev-shield proxy [--port 8788] [--host 127.0.0.1]
 jev-shield corpus
 jev-shield eval [--split test|dev|all] [--fixture scores.jsonl] [--baseline] [--canary]
 jev-shield eval-public --file external.jsonl
@@ -317,6 +319,27 @@ gandalf scores the published Gandalf solutions with Shield before a defender cal
     const server = createServer();
     server.listen(port, host, () => {
       process.stderr.write(`JEV Shield listening on http://${host}:${port}\n`);
+    });
+    return;
+  }
+
+  if (command === "proxy") {
+    const port = Number(
+      values.port ?? process.env.JEV_SHIELD_PROXY_PORT ?? 8788,
+    );
+    const host =
+      values.host ?? process.env.JEV_SHIELD_PROXY_HOST ?? "127.0.0.1";
+    if (host !== "127.0.0.1" && host !== "::1" && host !== "localhost") {
+      fail("The guarded proxy only listens on a loopback host.");
+    }
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      fail("Proxy port must be an integer from 1 to 65535.");
+    }
+    const server = createOpenAiProxyServer();
+    server.listen(port, host, () => {
+      process.stderr.write(
+        `JEV Shield guarded proxy listening on http://${host}:${port}/v1/chat/completions\n`,
+      );
     });
     return;
   }

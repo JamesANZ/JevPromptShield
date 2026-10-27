@@ -217,6 +217,21 @@ node dist/src/cli.js gandalf
 
 `source` defaults to `unknown`, which is judged as untrusted data. Pass the real source: `user`, `webpage`, `pdf`, `email`, `rag`, `tool`, `mcp`, `agent`, `database`, or `unknown`. The pinned model is `jev-1.13.0`. The published direct-API price used for the cost figure is $0.042 per million input tokens. Output tokens are free. Confirm the current price before you budget from it.
 
+## Guarded OpenAI-compatible proxy
+
+`jev-shield proxy` listens on `127.0.0.1:8788` and guards `POST /v1/chat/completions`. Point an OpenAI-compatible client at that local URL. The proxy scans every user message and tool result before sending the request upstream. Trusted system and developer messages are not sent to Jev. Earlier plain-text user turns are included as bounded, explicitly untrusted context for follow-up attacks.
+
+Text, inline base64 images, and `input_audio` use the same multimodal analyzer. Remote image URLs are rejected rather than fetched or passed through unscanned. An unsafe verdict returns HTTP 403 with `content_blocked`. Invalid content, provider failures, and a complete-scan timeout are also returned without calling the upstream model. Allowed responses, including streams, are forwarded with the upstream status.
+
+```bash
+export TYPESAFE_API_KEY=...
+export OPENAI_API_KEY=...
+node dist/src/cli.js proxy
+# Client base URL: http://127.0.0.1:8788/v1
+```
+
+`OPENAI_BASE_URL` changes the upstream base URL. `JEV_SHIELD_PROXY_CONTEXT` supplies a trusted application-policy summary. `JEV_SHIELD_PROXY_SCAN_TIMEOUT_MS` defaults to 20000 and bounds the entire pre-send scan. The proxy only listens on loopback. It is a content gate, not tool-call authorization or an operating-system sandbox.
+
 ## Mixed messages and MCP
 
 `analyzeMessage` and `POST /v1/analyze-message` accept one to sixteen `parts`. Each part is `text`, `image`, or `audio`, and can override the message-level `source` so pasted or retrieved material remains distinguishable from the user's own request. Every part is analyzed. The response contains each verdict and an aggregate that is unsafe when any part is unsafe. A transcription or Jev error rejects the request rather than producing an aggregate `safe` result.

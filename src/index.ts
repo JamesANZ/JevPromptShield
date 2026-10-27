@@ -11,6 +11,11 @@ export { type DocumentJudge } from "./jev/documents.js";
 export { createServer, type ServerOptions } from "./api/server.js";
 export { createMcpServer, startMcpServer } from "./mcp/server.js";
 export {
+  createOpenAiProxyServer,
+  guardChatCompletion,
+  type OpenAiProxyOptions,
+} from "./proxy.js";
+export {
   COMPARE_QUESTION_SET_VERSION,
   DEFAULT_MATCH_THRESHOLD,
   DEFAULT_THRESHOLDS,

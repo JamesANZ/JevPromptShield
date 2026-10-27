@@ -1,7 +1,11 @@
 import { execFile } from "node:child_process";
 import { access, open, readFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
-import { claudeHookInstalled, promptHookInstalled } from "./install.js";
+import {
+  claudeHookInstalled,
+  contentHooksInstalled,
+  promptHookInstalled,
+} from "./install.js";
 import { resolveEnforcementConfig } from "../../enforcement/config.js";
 import { resolveTypesafeApiKey } from "../../jev/key.js";
 
@@ -97,6 +101,15 @@ export async function runDoctor(options: {
             name: "prompt",
             status: "fail",
             detail: `No jev-shield prompt hook in ${options.settingsPath}`,
+          },
+    );
+    checks.push(
+      contentHooksInstalled(settings)
+        ? { name: "tool_content", status: "ok", detail: options.settingsPath }
+        : {
+            name: "tool_content",
+            status: "fail",
+            detail: `No jev-shield tool-content hooks in ${options.settingsPath}`,
           },
     );
   } catch {

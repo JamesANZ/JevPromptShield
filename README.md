@@ -90,7 +90,7 @@ Build the project so `dist/src/cli.js` exists, then install the hooks. The TypeS
 node dist/src/cli.js setup claude
 ```
 
-That merges two handlers into `~/.claude/settings.json`. A `PreToolUse` handler checks `Bash` commands. A `UserPromptSubmit` handler scores every submitted prompt and blocks it when the score is not safe. Other hooks are left in place. Run it again and it updates the same handlers.
+That merges four defenses into `~/.claude/settings.json`. A `PreToolUse` handler checks `Bash` commands. A `UserPromptSubmit` handler scores every submitted prompt. `hook content-input` scans Write, Edit, MultiEdit, NotebookEdit, and MCP inputs before execution. `hook content-output` scans tool results, including MCP image content, before Claude receives them. Unsafe or unscannable tool output is replaced through `updatedToolOutput` with a same-shape quarantine value and a blocking decision. Other hooks are left in place. Run it again and it updates the same handlers.
 
 `TYPESAFE_API_KEY` can be in the environment Claude Code passes to the hook, or in an `env` block of `~/.cursor/mcp.json`, Claude Desktop's `claude_desktop_config.json`, or `~/.claude.json`. The process environment wins. The key is never printed.
 
@@ -105,7 +105,7 @@ node dist/src/cli.js doctor
 node dist/src/cli.js test
 ```
 
-`doctor` checks Node, the CLI file, that a TypeSafe key is available without printing it, that both hook entries exist, and that the audit log can be appended. It also prints `claude --version` when the binary is on PATH. `test` runs fixture commands through the local policy and a mock Jev. It does not call the network.
+`doctor` checks Node, the CLI file, that a TypeSafe key is available without printing it, that the prompt, Bash, and tool-content hook entries exist, and that the audit log can be appended. It also prints `claude --version` when the binary is on PATH. `test` runs fixture commands through the local policy and a mock Jev. It does not call the network.
 
 The Bash hook is the absolute path to this Node binary plus `hook claude`, with a 15 second host timeout. The Jev action call itself is capped at 2.5 seconds, with no retries, so a slow response becomes ASK or BLOCK inside the process. The hook always exits 0 and prints one JSON object. Claude Code treats other exit codes as non-blocking, which would let the command run.
 
@@ -155,6 +155,8 @@ This version covers:
 
 - Claude Code prompts, through `UserPromptSubmit`, scored before the prompt is accepted.
 - Claude Code `Bash` tool calls, including Bash calls made by subagents, because `PreToolUse` runs before the tool executes.
+- Write, Edit, MultiEdit, NotebookEdit, and MCP inputs, content-scanned before execution.
+- Tool and MCP results, including MCP image content, scanned after execution and replaced before Claude receives unsafe or unscannable output.
 - A hook `deny`, which still blocks when an allow rule would have permitted the command, including in `bypassPermissions` mode.
 - A hook `allow`, which does not override a Claude deny or ask rule. Claude's stricter rules still win.
 
@@ -163,7 +165,8 @@ This version leaves alone:
 - The operating system. The hook is not a sandbox. It sees the command string Claude submitted, not every child process that command might start.
 - Commands you type yourself in a terminal.
 - Files inserted with `@` in a prompt. Those never become a tool call, so `PreToolUse` does not fire.
-- Tools other than `Bash`. Writes, web fetches, and MCP tools are not hooked yet.
+- Action authorization for tools other than `Bash`. Their content is scanned, but their general permission policy remains Claude's responsibility.
+- Side effects that already happened before `PostToolUse` runs. Output quarantine protects the next model step; it does not undo a tool action.
 - A session with `disableAllHooks`, a deleted settings entry, or an enterprise policy that ignores user hooks.
 - A host timeout that fires before Shield answers. HTTP hook timeouts fail open, and the docs are less clear for command hooks. Shield returns its own decision before the 15 second host timeout, using a 2.5 second Jev cap.
 - The exact behaviour of `permissionDecision: "ask"` on older Claude Code builds. Auto mode is documented as forcing a prompt as of Claude Code 2.1.211. `doctor` can print the version. It cannot prove the host honors `ask`.

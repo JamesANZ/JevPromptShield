@@ -12,9 +12,16 @@ import {
 import { handleClaudeHook } from "./adapters/claude/hook.js";
 import { handlePromptSubmit } from "./adapters/claude/prompt.js";
 import {
+  handleClaudeContentInput,
+  handleClaudeContentOutput,
+} from "./adapters/claude/content.js";
+import {
+  claudeContentInputHookCommand,
+  claudeContentOutputHookCommand,
   claudeHookCommand,
   claudePromptHookCommand,
   installClaudeHook,
+  installContentHooks,
   installPromptHook,
 } from "./adapters/claude/install.js";
 import { runSelfCheck } from "./enforcement/self-check.js";
@@ -112,8 +119,13 @@ async function runGateCommand(command: string): Promise<void> {
 
   if (command === "hook") {
     const which = process.argv[3];
-    if (which !== "claude" && which !== "prompt") {
-      fail("Usage: jev-shield hook claude|prompt");
+    if (
+      which !== "claude" &&
+      which !== "prompt" &&
+      which !== "content-input" &&
+      which !== "content-output"
+    ) {
+      fail("Usage: jev-shield hook claude|prompt|content-input|content-output");
     }
     const chunks: Buffer[] = [];
     for await (const chunk of process.stdin) {
@@ -123,7 +135,11 @@ async function runGateCommand(command: string): Promise<void> {
     const result =
       which === "claude"
         ? await handleClaudeHook(stdin)
-        : await handlePromptSubmit(stdin);
+        : which === "prompt"
+          ? await handlePromptSubmit(stdin)
+          : which === "content-input"
+            ? await handleClaudeContentInput(stdin)
+            : await handleClaudeContentOutput(stdin);
     process.stdout.write(`${JSON.stringify(result.body)}\n`);
     return;
   }
@@ -153,8 +169,13 @@ async function runGateCommand(command: string): Promise<void> {
       settingsPath,
       claudePromptHookCommand(process.execPath, cliPath),
     );
+    const content = await installContentHooks(
+      settingsPath,
+      claudeContentInputHookCommand(process.execPath, cliPath),
+      claudeContentOutputHookCommand(process.execPath, cliPath),
+    );
     process.stdout.write(
-      `${bash.changed || prompt.changed ? "Installed" : "Already installed"} Claude Code hooks in ${settingsPath}\n`,
+      `${bash.changed || prompt.changed || content.changed ? "Installed" : "Already installed"} Claude Code hooks in ${settingsPath}\n`,
     );
     return;
   }
@@ -292,6 +313,8 @@ jev-shield doctor [--project] [--settings path]
 jev-shield test
 jev-shield hook claude
 jev-shield hook prompt
+jev-shield hook content-input
+jev-shield hook content-output
 jev-shield mcp
 jev-shield analyze --source webpage --file page.txt
 jev-shield analyze --source user --content "text"

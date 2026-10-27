@@ -34,6 +34,20 @@ export function claudePromptHookCommand(
   return `${quoteShellArg(nodePath)} ${quoteShellArg(cliPath)} hook prompt`;
 }
 
+export function claudeContentInputHookCommand(
+  nodePath: string,
+  cliPath: string,
+): string {
+  return `${quoteShellArg(nodePath)} ${quoteShellArg(cliPath)} hook content-input`;
+}
+
+export function claudeContentOutputHookCommand(
+  nodePath: string,
+  cliPath: string,
+): string {
+  return `${quoteShellArg(nodePath)} ${quoteShellArg(cliPath)} hook content-output`;
+}
+
 function isOurs(handler: unknown): handler is HookHandler {
   if (handler === null || typeof handler !== "object") return false;
   const command = (handler as HookHandler).command;
@@ -201,6 +215,127 @@ export function claudeHookInstalled(settings: unknown): boolean {
   );
 }
 
+function commandIncludes(fragment: string) {
+  return (handler: unknown): boolean =>
+    handler !== null &&
+    typeof handler === "object" &&
+    typeof (handler as HookHandler).command === "string" &&
+    (handler as HookHandler).command?.includes(fragment) === true;
+}
+
+function mergeEventHook(
+  existing: unknown,
+  event: "PreToolUse" | "PostToolUse",
+  matcher: string,
+  command: string,
+  fragment: string,
+): { settings: Record<string, unknown>; changed: boolean } {
+  if (
+    existing === null ||
+    typeof existing !== "object" ||
+    Array.isArray(existing)
+  ) {
+    throw new ShieldError(
+      "invalid_request",
+      "Claude settings must be a JSON object.",
+    );
+  }
+  const settings = structuredClone(existing) as Record<string, unknown>;
+  const hooksRaw = settings.hooks;
+  const hooks: Record<string, unknown> =
+    hooksRaw !== null && typeof hooksRaw === "object" && !Array.isArray(hooksRaw)
+      ? (hooksRaw as Record<string, unknown>)
+      : {};
+  settings.hooks = hooks;
+  const groups: MatcherGroup[] = Array.isArray(hooks[event])
+    ? (hooks[event] as MatcherGroup[])
+    : [];
+  hooks[event] = groups;
+  const isHandler = commandIncludes(fragment);
+  let group = groups.find(
+    (item) =>
+      item &&
+      typeof item === "object" &&
+      item.matcher === matcher &&
+      Array.isArray(item.hooks) &&
+      item.hooks.some(isHandler),
+  );
+  if (!group) {
+    group = groups.find(
+      (item) => item && typeof item === "object" && item.matcher === matcher,
+    );
+  }
+  if (!group) {
+    group = { matcher, hooks: [] };
+    groups.push(group);
+  }
+  if (!Array.isArray(group.hooks)) group.hooks = [];
+  const handler: HookHandler = {
+    type: "command",
+    command,
+    timeout: event === "PostToolUse" ? 60 : 20,
+  };
+  const index = group.hooks.findIndex(isHandler);
+  if (index === -1) group.hooks.push(handler);
+  else group.hooks[index] = { ...(group.hooks[index] as HookHandler), ...handler };
+  return {
+    settings,
+    changed: JSON.stringify(existing) !== JSON.stringify(settings),
+  };
+}
+
+export function mergeContentHooks(
+  existing: unknown,
+  inputCommand: string,
+  outputCommand: string,
+): { settings: Record<string, unknown>; changed: boolean } {
+  const input = mergeEventHook(
+    existing,
+    "PreToolUse",
+    "Write|Edit|MultiEdit|NotebookEdit|mcp__.*",
+    inputCommand,
+    "hook content-input",
+  );
+  const output = mergeEventHook(
+    input.settings,
+    "PostToolUse",
+    ".*",
+    outputCommand,
+    "hook content-output",
+  );
+  return {
+    settings: output.settings,
+    changed: input.changed || output.changed,
+  };
+}
+
+function eventHookInstalled(
+  settings: unknown,
+  event: "PreToolUse" | "PostToolUse",
+  fragment: string,
+): boolean {
+  if (settings === null || typeof settings !== "object" || Array.isArray(settings))
+    return false;
+  const hooks = (settings as { hooks?: Record<string, unknown> }).hooks;
+  const groups = hooks?.[event];
+  if (!Array.isArray(groups)) return false;
+  const isHandler = commandIncludes(fragment);
+  return groups.some(
+    (group) =>
+      group !== null &&
+      typeof group === "object" &&
+      Array.isArray((group as MatcherGroup).hooks) &&
+      (group as MatcherGroup).hooks?.some(isHandler) === true,
+  );
+}
+
+export function contentHooksInstalled(settings: unknown): boolean {
+  return (
+    eventHookInstalled(settings, "PreToolUse", "hook content-input") &&
+    eventHookInstalled(settings, "PostToolUse", "hook content-output")
+  );
+}
+
 async function readSettings(settingsPath: string): Promise<unknown> {
   try {
     const text = await readFile(settingsPath, "utf8");
@@ -249,5 +384,20 @@ export async function installPromptHook(
   return writeSettings(
     settingsPath,
     mergePromptHook(await readSettings(settingsPath), command),
+  );
+}
+
+export async function installContentHooks(
+  settingsPath: string,
+  inputCommand: string,
+  outputCommand: string,
+): Promise<{ changed: boolean }> {
+  return writeSettings(
+    settingsPath,
+    mergeContentHooks(
+      await readSettings(settingsPath),
+      inputCommand,
+      outputCommand,
+    ),
   );
 }

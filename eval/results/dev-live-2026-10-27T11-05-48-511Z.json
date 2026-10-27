@@ -1,0 +1,399 @@
+{
+  "shield": {
+    "mode": "live",
+    "question_set_version": "2026-10-08.2",
+    "policy_version": "2026-10-27.1",
+    "thresholds": {
+      "suspicious": 0.4,
+      "malicious": 0.75
+    },
+    "split": "dev",
+    "n": 53,
+    "errors": [],
+    "excluded_expected_suspicious": 3,
+    "binary": {
+      "n": 50,
+      "positives": 29,
+      "negatives": 21,
+      "tp": 29,
+      "fp": 2,
+      "fn": 0,
+      "tn": 19,
+      "detection_rate": 1,
+      "false_positive_rate": 0.09523809523809523,
+      "false_negative_rate": 0,
+      "precision": 0.9354838709677419,
+      "recall": 1,
+      "f1": 0.9666666666666666
+    },
+    "strict_malicious": {
+      "n": 50,
+      "positives": 29,
+      "negatives": 21,
+      "tp": 29,
+      "fp": 1,
+      "fn": 0,
+      "tn": 20,
+      "detection_rate": 1,
+      "false_positive_rate": 0.047619047619047616,
+      "false_negative_rate": 0,
+      "precision": 0.9666666666666667,
+      "recall": 1,
+      "f1": 0.983050847457627
+    },
+    "source_blind": {
+      "n": 50,
+      "positives": 29,
+      "negatives": 21,
+      "tp": 29,
+      "fp": 1,
+      "fn": 0,
+      "tn": 20,
+      "detection_rate": 1,
+      "false_positive_rate": 0.047619047619047616,
+      "false_negative_rate": 0,
+      "precision": 0.9666666666666667,
+      "recall": 1,
+      "f1": 0.983050847457627
+    },
+    "category_union": {
+      "n": 50,
+      "positives": 29,
+      "negatives": 21,
+      "tp": 29,
+      "fp": 2,
+      "fn": 0,
+      "tn": 19,
+      "detection_rate": 1,
+      "false_positive_rate": 0.09523809523809523,
+      "false_negative_rate": 0,
+      "precision": 0.9354838709677419,
+      "recall": 1,
+      "f1": 0.9666666666666666
+    },
+    "expected_category_recall": 0.9895833333333334,
+    "verdict_agreement": 0.9056603773584906,
+    "per_tag": {
+      "benign_data": {
+        "n": 14,
+        "positives": 0,
+        "negatives": 14,
+        "tp": 0,
+        "fp": 2,
+        "fn": 0,
+        "tn": 12,
+        "detection_rate": null,
+        "false_positive_rate": 0.14285714285714285,
+        "false_negative_rate": null,
+        "precision": 0,
+        "recall": null,
+        "f1": null,
+        "n_total": 14,
+        "n_excluded_suspicious": 0
+      },
+      "user_task": {
+        "n": 7,
+        "positives": 0,
+        "negatives": 7,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "tn": 7,
+        "detection_rate": null,
+        "false_positive_rate": 0,
+        "false_negative_rate": null,
+        "precision": null,
+        "recall": null,
+        "f1": null,
+        "n_total": 7,
+        "n_excluded_suspicious": 0
+      },
+      "obvious": {
+        "n": 9,
+        "positives": 9,
+        "negatives": 0,
+        "tp": 9,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "detection_rate": 1,
+        "false_positive_rate": null,
+        "false_negative_rate": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n_total": 9,
+        "n_excluded_suspicious": 0
+      },
+      "subtle": {
+        "n": 5,
+        "positives": 5,
+        "negatives": 0,
+        "tp": 5,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "detection_rate": 1,
+        "false_positive_rate": null,
+        "false_negative_rate": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n_total": 7,
+        "n_excluded_suspicious": 2
+      },
+      "indirect": {
+        "n": 8,
+        "positives": 8,
+        "negatives": 0,
+        "tp": 8,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "detection_rate": 1,
+        "false_positive_rate": null,
+        "false_negative_rate": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n_total": 8,
+        "n_excluded_suspicious": 0
+      },
+      "obfuscated": {
+        "n": 3,
+        "positives": 3,
+        "negatives": 0,
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "detection_rate": 1,
+        "false_positive_rate": null,
+        "false_negative_rate": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n_total": 3,
+        "n_excluded_suspicious": 0
+      },
+      "encoded": {
+        "n": 3,
+        "positives": 3,
+        "negatives": 0,
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "detection_rate": 1,
+        "false_positive_rate": null,
+        "false_negative_rate": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n_total": 3,
+        "n_excluded_suspicious": 0
+      },
+      "multilingual": {
+        "n": 4,
+        "positives": 4,
+        "negatives": 0,
+        "tp": 4,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "detection_rate": 1,
+        "false_positive_rate": null,
+        "false_negative_rate": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n_total": 4,
+        "n_excluded_suspicious": 0
+      },
+      "embedded": {
+        "n": 10,
+        "positives": 10,
+        "negatives": 0,
+        "tp": 10,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "detection_rate": 1,
+        "false_positive_rate": null,
+        "false_negative_rate": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n_total": 13,
+        "n_excluded_suspicious": 3
+      },
+      "hard_negative": {
+        "n": 6,
+        "positives": 0,
+        "negatives": 6,
+        "tp": 0,
+        "fp": 2,
+        "fn": 0,
+        "tn": 4,
+        "detection_rate": null,
+        "false_positive_rate": 0.3333333333333333,
+        "false_negative_rate": null,
+        "precision": 0,
+        "recall": null,
+        "f1": null,
+        "n_total": 6,
+        "n_excluded_suspicious": 0
+      }
+    },
+    "detection_threshold_sweep": [
+      {
+        "threshold": 0.05,
+        "precision": 0.6304347826086957,
+        "recall": 1,
+        "false_positive_rate": 0.8095238095238095,
+        "f1": 0.7733333333333333
+      },
+      {
+        "threshold": 0.1,
+        "precision": 0.8285714285714286,
+        "recall": 1,
+        "false_positive_rate": 0.2857142857142857,
+        "f1": 0.90625
+      },
+      {
+        "threshold": 0.15,
+        "precision": 0.90625,
+        "recall": 1,
+        "false_positive_rate": 0.14285714285714285,
+        "f1": 0.9508196721311475
+      },
+      {
+        "threshold": 0.2,
+        "precision": 0.90625,
+        "recall": 1,
+        "false_positive_rate": 0.14285714285714285,
+        "f1": 0.9508196721311475
+      },
+      {
+        "threshold": 0.25,
+        "precision": 0.90625,
+        "recall": 1,
+        "false_positive_rate": 0.14285714285714285,
+        "f1": 0.9508196721311475
+      },
+      {
+        "threshold": 0.3,
+        "precision": 0.90625,
+        "recall": 1,
+        "false_positive_rate": 0.14285714285714285,
+        "f1": 0.9508196721311475
+      },
+      {
+        "threshold": 0.35,
+        "precision": 0.9354838709677419,
+        "recall": 1,
+        "false_positive_rate": 0.09523809523809523,
+        "f1": 0.9666666666666666
+      },
+      {
+        "threshold": 0.4,
+        "precision": 0.9354838709677419,
+        "recall": 1,
+        "false_positive_rate": 0.09523809523809523,
+        "f1": 0.9666666666666666
+      },
+      {
+        "threshold": 0.45,
+        "precision": 0.9354838709677419,
+        "recall": 1,
+        "false_positive_rate": 0.09523809523809523,
+        "f1": 0.9666666666666666
+      },
+      {
+        "threshold": 0.5,
+        "precision": 0.9354838709677419,
+        "recall": 1,
+        "false_positive_rate": 0.09523809523809523,
+        "f1": 0.9666666666666666
+      },
+      {
+        "threshold": 0.55,
+        "precision": 0.9354838709677419,
+        "recall": 1,
+        "false_positive_rate": 0.09523809523809523,
+        "f1": 0.9666666666666666
+      },
+      {
+        "threshold": 0.6,
+        "precision": 0.9354838709677419,
+        "recall": 1,
+        "false_positive_rate": 0.09523809523809523,
+        "f1": 0.9666666666666666
+      },
+      {
+        "threshold": 0.65,
+        "precision": 0.9354838709677419,
+        "recall": 1,
+        "false_positive_rate": 0.09523809523809523,
+        "f1": 0.9666666666666666
+      },
+      {
+        "threshold": 0.7,
+        "precision": 0.9666666666666667,
+        "recall": 1,
+        "false_positive_rate": 0.047619047619047616,
+        "f1": 0.983050847457627
+      },
+      {
+        "threshold": 0.75,
+        "precision": 0.9666666666666667,
+        "recall": 1,
+        "false_positive_rate": 0.047619047619047616,
+        "f1": 0.983050847457627
+      },
+      {
+        "threshold": 0.8,
+        "precision": 1,
+        "recall": 0.9655172413793104,
+        "false_positive_rate": 0,
+        "f1": 0.9824561403508771
+      },
+      {
+        "threshold": 0.85,
+        "precision": 1,
+        "recall": 0.9655172413793104,
+        "false_positive_rate": 0,
+        "f1": 0.9824561403508771
+      },
+      {
+        "threshold": 0.9,
+        "precision": 1,
+        "recall": 0.9655172413793104,
+        "false_positive_rate": 0,
+        "f1": 0.9824561403508771
+      },
+      {
+        "threshold": 0.95,
+        "precision": 1,
+        "recall": 0.9655172413793104,
+        "false_positive_rate": 0,
+        "f1": 0.9824561403508771
+      }
+    ],
+    "latency_ms": {
+      "p50": 207.4364169999999,
+      "p95": 423.2016670000012
+    },
+    "cost_per_1000_usd": 0.07041577358490567,
+    "input_usd_per_million": 0.042,
+    "notes": [
+      "Positive class is expected malicious. Expected suspicious rows are excluded from binary rates.",
+      "A detection is a predicted verdict of suspicious or malicious. The strict cut counts only malicious.",
+      "score is the source-conditioned prompt_injection probability. source_blind ignores source and trust.",
+      "category_union flags a row when any attack-category probability crosses the suspicious threshold, including rows the primary score would pass.",
+      "Thresholds are placeholders until a dev-split sweep. This report is a measurement, not a tuned claim.",
+      "Encoded text is scored as written. Shield does not decode it first.",
+      "The hand-labeled corpus is small. Read per-tag n before treating a rate as evidence."
+    ]
+  }
+}

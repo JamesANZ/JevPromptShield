@@ -3,7 +3,7 @@ import type { Thresholds } from "./types.js";
 
 export const QUESTION_SET_VERSION = "2026-10-08.2";
 export const COMPARE_QUESTION_SET_VERSION = "2026-10-20.1";
-export const POLICY_VERSION = "2026-10-27.1";
+export const POLICY_VERSION = "2026-10-27.2";
 export const PINNED_MODEL = "jev-1.13.0";
 
 /** Published TypeSafe direct-API input price for Jev 1.13. Output tokens are free. */
@@ -25,7 +25,7 @@ export const MAX_MESSAGE_PARTS = 16;
 export const DEFAULT_MATCH_THRESHOLD = 0.5;
 
 export const DEFAULT_THRESHOLDS: Thresholds = {
-  suspicious: 0.4,
+  suspicious: 0.7,
   malicious: 0.75,
 };
 

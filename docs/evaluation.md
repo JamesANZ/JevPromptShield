@@ -40,4 +40,10 @@ Rows that throw are listed under `errors` and stay out of the confusion matrix. 
 
 `TYPESAFE_API_KEY` is required for a live eval. With no key and no `--fixture` file, the command exits 2 and writes nothing. Do not fill `eval/results/` with guessed scores. The Gandalf command uses the same rule.
 
-The default thresholds are configurable conservative defaults, not a claim of live calibration. Use `detection_threshold_sweep` on the dev split to choose them, record the policy version and metrics, then evaluate the untouched test split once. A mocked test run does not establish real-world precision or recall.
+Use `detection_threshold_sweep` on the dev split to choose thresholds, record the policy version and metrics, then evaluate the untouched test split once. A mocked test run does not establish real-world precision or recall.
+
+## Development calibration, 2026-10-27
+
+Two live runs scored the same 53 development cases with question set `2026-10-08.2` and no errors. The original `0.40 / 0.75` thresholds produced 100% detection recall, 93.5% precision, and a 9.5% false-positive rate. The sweep identified `0.70 / 0.75` as the highest-F1 candidate that retained recall. A fresh confirmation run at those thresholds produced 100% detection recall, 96.7% precision, and a 4.8% false-positive rate. Policy version `2026-10-27.2` adopts them. These are small development-set measurements, not expected production performance.
+
+The preserved reports are `eval/results/dev-live-2026-10-27T11-05-48-511Z.json` and `eval/results/dev-live-2026-10-27T11-16-36-320Z.json`. The test split was not scored during this calibration.

@@ -201,10 +201,10 @@ export function buildEvalReport(input: {
   const notes = [
     "Positive class is expected malicious. Expected suspicious rows are excluded from binary rates.",
     "A detection is a predicted verdict of suspicious or malicious. The strict cut counts only malicious.",
-    "score is the source-conditioned prompt_injection probability. source_blind ignores source and trust.",
-    "category_union flags a row when any attack-category probability crosses the suspicious threshold, including rows the primary score would pass.",
-    "Thresholds are placeholders until a dev-split sweep. This report is a measurement, not a tuned claim.",
-    "Encoded text is scored as written. Shield does not decode it first.",
+    "score is the highest attack-category probability. source_blind ignores source and trust and remains diagnostic.",
+    "category_union flags a row when any attack-category probability crosses the suspicious threshold; this is also the production verdict rule.",
+    "Tune thresholds on the dev split only. Preserve the report, then evaluate the reserved test split separately.",
+    "Encoded text is scored as written and through bounded normalized or decoded inspection forms.",
     "The hand-labeled corpus is small. Read per-tag n before treating a rate as evidence.",
   ];
   if (input.mode === "fixture") {

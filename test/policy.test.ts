@@ -42,8 +42,8 @@ describe("policy", () => {
     const result = applyPolicy(
       decisionFromScores(
         {
-          prompt_injection: 0.4,
-          instruction_override: 0.4,
+          prompt_injection: 0.7,
+          instruction_override: 0.7,
           data_exfiltration: 0.39,
         },
         { content_role: "model_instruction", content_role_probability: 0.8 },

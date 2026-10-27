@@ -33,6 +33,7 @@ describe("cli", () => {
   it("refuses a live eval when the API key is absent", async () => {
     const env = { ...process.env };
     delete env.TYPESAFE_API_KEY;
+    env.JEV_SHIELD_DISABLE_KEY_DISCOVERY = "1";
     const result = await runCli(["eval", "--split", "test"], env);
     assert.equal(result.code, 2);
     assert.match(result.stderr, /Refusing to invent scores/);

@@ -505,7 +505,7 @@ gandalf scores the published Gandalf solutions with Shield before a defender cal
     );
     const selected = selectSplit(cases, split);
     const fixturePath = values.fixture;
-    const hasKey = Boolean(process.env.TYPESAFE_API_KEY?.trim());
+    const hasKey = Boolean(resolveTypesafeApiKey());
     if (!fixturePath && !hasKey) {
       fail(
         "TYPESAFE_API_KEY is missing and no --fixture file was given. Refusing to invent scores.",

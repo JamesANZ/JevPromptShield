@@ -17,11 +17,13 @@ import {
   prepareMedia,
   type MediaTranscriber,
 } from "./media/transcribe.js";
+import { resolveModality } from "./modality.js";
 import type {
   CompareDocument,
   CompareDocumentResult,
   CompareRequest,
   CompareResult,
+  MediaAttachment,
 } from "./types.js";
 
 export interface CompareOptions {
@@ -47,38 +49,32 @@ async function documentText(
   index: number,
   transcriber: MediaTranscriber,
 ): Promise<{ content: string; transcript?: string }> {
-  const hasContent = document.content !== undefined;
-  const hasImage = document.image !== undefined;
-  const hasAudio = document.audio !== undefined;
-  const attachments = Number(hasContent) + Number(hasImage) + Number(hasAudio);
   const label = documentLabel(index, document.name);
-  if (attachments !== 1) {
-    throw new ShieldError(
-      "invalid_request",
-      `${label} must include content, image, or audio, and only one of them.`,
-    );
-  }
-  if (hasContent) {
-    if (
-      typeof document.content !== "string" ||
-      document.content.trim() === ""
-    ) {
+  const modality = resolveModality(
+    document,
+    `${label} must include content, image, or audio, and only one of them.`,
+  );
+  if (modality.modality === "text") {
+    if (typeof modality.value !== "string" || modality.value.trim() === "") {
       throw new ShieldError(
         "invalid_request",
         `${label} content must be a non-empty string.`,
       );
     }
-    return { content: document.content };
+    return { content: modality.value };
   }
-  const kind = hasImage ? "image" : "audio";
-  const attachment = hasImage ? document.image : document.audio;
-  if (!attachment) {
+  const kind = modality.modality;
+  if (
+    modality.value === null ||
+    typeof modality.value !== "object" ||
+    Array.isArray(modality.value)
+  ) {
     throw new ShieldError(
       "invalid_request",
-      `${label} is missing its attachment.`,
+      `${label} is missing its ${kind}.`,
     );
   }
-  const prepared = prepareMedia(kind, attachment);
+  const prepared = prepareMedia(kind, modality.value as MediaAttachment);
   let raw: string;
   try {
     raw =

@@ -8,25 +8,8 @@ export interface PolicyChoice {
   reason: string;
 }
 
-export function decisionFromJudgement(
-  judgement: ActionJudgement,
-): PolicyChoice {
-  if (judgement.irreversible >= 0.75) {
-    return {
-      decision: "BLOCK",
-      reason: "Jev rated the command as likely irreversible harm.",
-    };
-  }
-  if (judgement.disposition === "block") {
-    if (judgement.confidence >= CONFIDENCE_FLOOR) {
-      return { decision: "BLOCK", reason: "Jev blocked the command." };
-    }
-    return {
-      decision: "ASK",
-      reason: "Jev leaned toward block with low confidence.",
-    };
-  }
-  if (judgement.disposition === "ask" || judgement.irreversible >= 0.4) {
+function allowPhase(judgement: ActionJudgement): PolicyChoice {
+  if (judgement.irreversible >= 0.4) {
     return {
       decision: "ASK",
       reason: "Jev asked for confirmation before the command runs.",
@@ -39,4 +22,41 @@ export function decisionFromJudgement(
     decision: "ASK",
     reason: "Jev leaned toward allow with low confidence.",
   };
+}
+
+/**
+ * One transition from a Jev judgement to ALLOW, ASK, or BLOCK.
+ * Irreversible harm at 0.75 or more blocks before the disposition is trusted.
+ * A block disposition, an ask disposition, and an allow disposition do not overlap.
+ */
+export function decisionFromJudgement(
+  judgement: ActionJudgement,
+): PolicyChoice {
+  if (judgement.irreversible >= 0.75) {
+    return {
+      decision: "BLOCK",
+      reason: "Jev rated the command as likely irreversible harm.",
+    };
+  }
+  switch (judgement.disposition) {
+    case "block":
+      if (judgement.confidence >= CONFIDENCE_FLOOR) {
+        return { decision: "BLOCK", reason: "Jev blocked the command." };
+      }
+      return {
+        decision: "ASK",
+        reason: "Jev leaned toward block with low confidence.",
+      };
+    case "ask":
+      return {
+        decision: "ASK",
+        reason: "Jev asked for confirmation before the command runs.",
+      };
+    case "allow":
+      return allowPhase(judgement);
+    default: {
+      const unexpected: never = judgement.disposition;
+      throw new Error(`Unexpected action disposition ${String(unexpected)}.`);
+    }
+  }
 }

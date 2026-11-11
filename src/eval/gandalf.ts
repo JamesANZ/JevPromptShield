@@ -101,34 +101,48 @@ export const GANDALF_LEVELS: readonly GandalfLevel[] = [
   },
 ];
 
-export interface GandalfTurn {
+interface GandalfTurnBase {
   id: string;
-  level: number | null;
   session: string;
   turn: number;
-  kind: "attack" | "benign";
   content: string;
   notes?: string;
 }
 
+/** An attack belongs to a level. A benign turn has no level to smuggle in. */
+export type GandalfTurn =
+  | (GandalfTurnBase & { kind: "attack"; level: number })
+  | (GandalfTurnBase & { kind: "benign" });
+
 export type GandalfOutcome =
   "rejected" | "held_by_keyword" | "reached_defender" | "error";
 
-export interface GandalfTurnResult {
+interface GandalfResultBase {
   id: string;
   level: number | null;
   session: string;
   turn: number;
   kind: "attack" | "benign";
   content: string;
-  outcome: GandalfOutcome;
-  verdict?: string;
-  score?: number;
-  categories?: Category[];
-  reason?: string;
-  keyword?: string;
-  error?: string;
 }
+
+interface GandalfScore {
+  verdict: string;
+  score: number;
+  categories: Category[];
+  reason: string;
+}
+
+/**
+ * Outcome decides which fields exist.
+ * A keyword hold has the word that caught it. An error has no score.
+ */
+export type GandalfTurnResult =
+  | (GandalfResultBase &
+      GandalfScore & { outcome: "rejected" | "reached_defender" })
+  | (GandalfResultBase &
+      GandalfScore & { outcome: "held_by_keyword"; keyword: string })
+  | (GandalfResultBase & { outcome: "error"; error: string });
 
 export interface GandalfCounts {
   n: number;
@@ -268,7 +282,14 @@ export function parseGandalfTurn(raw: unknown, line: number): GandalfTurn {
       `Gandalf case ${raw.id} has an invalid turn.`,
     );
   }
-  let level: number | null = null;
+  const notes = typeof raw.notes === "string" ? { notes: raw.notes } : {};
+  const base = {
+    id: raw.id,
+    session: raw.session,
+    turn: raw.turn,
+    content: raw.content,
+    ...notes,
+  };
   if (raw.kind === "attack") {
     if (
       typeof raw.level !== "number" ||
@@ -279,23 +300,15 @@ export function parseGandalfTurn(raw: unknown, line: number): GandalfTurn {
         `Gandalf case ${raw.id} has an unknown level.`,
       );
     }
-    level = raw.level;
-  } else if (raw.level !== undefined) {
+    return { ...base, kind: "attack", level: raw.level };
+  }
+  if (raw.level !== undefined) {
     throw new ShieldError(
       "invalid_request",
       `Gandalf case ${raw.id} is benign and must not set a level.`,
     );
   }
-  const turn: GandalfTurn = {
-    id: raw.id,
-    level,
-    session: raw.session,
-    turn: raw.turn,
-    kind: raw.kind,
-    content: raw.content,
-  };
-  if (typeof raw.notes === "string") turn.notes = raw.notes;
-  return turn;
+  return { ...base, kind: "benign" };
 }
 
 export async function loadGandalf(path: string): Promise<GandalfTurn[]> {
@@ -319,15 +332,16 @@ export async function loadGandalf(path: string): Promise<GandalfTurn[]> {
   return turns;
 }
 
-export async function runGandalfPrecheck(input: {
-  turns: GandalfTurn[];
-  client?: JevClient;
-  mode?: "live" | "fixture";
-  onSend?: (turn: GandalfTurn) => void;
-}): Promise<GandalfReport> {
+export async function runGandalfPrecheck(
+  input: {
+    turns: readonly GandalfTurn[];
+    onSend?: (turn: GandalfTurn) => void;
+  } & ({ mode: "live" } | { mode: "fixture"; client: JevClient }),
+): Promise<GandalfReport> {
   const turns: GandalfTurnResult[] = [];
   for (const item of input.turns) {
-    const level = item.level === null ? undefined : gandalfLevel(item.level);
+    const level = item.kind === "attack" ? gandalfLevel(item.level) : undefined;
+    const reportedLevel = item.kind === "attack" ? item.level : null;
     try {
       const judgment = await analyze(
         {
@@ -335,37 +349,36 @@ export async function runGandalfPrecheck(input: {
           source: "user",
           context: gandalfContext(item, input.turns),
         },
-        input.client ? { client: input.client } : {},
+        input.mode === "fixture" ? { client: input.client } : {},
       );
       const keyword = level
         ? keywordHit(level.keywords, item.content)
         : undefined;
-      let outcome: GandalfOutcome;
-      if (!judgment.safe) outcome = "rejected";
-      else if (keyword) outcome = "held_by_keyword";
-      else {
-        outcome = "reached_defender";
-        input.onSend?.(item);
-      }
-      turns.push({
+      const scored = {
         id: item.id,
-        level: item.level,
+        level: reportedLevel,
         session: item.session,
         turn: item.turn,
         kind: item.kind,
         content: item.content,
-        outcome,
         verdict: judgment.verdict,
         score: judgment.score,
         categories: judgment.categories,
         reason: judgment.reason,
-        ...(outcome === "held_by_keyword" && keyword ? { keyword } : {}),
-      });
+      };
+      if (!judgment.safe) {
+        turns.push({ ...scored, outcome: "rejected" });
+      } else if (keyword !== undefined) {
+        turns.push({ ...scored, outcome: "held_by_keyword", keyword });
+      } else {
+        input.onSend?.(item);
+        turns.push({ ...scored, outcome: "reached_defender" });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown error";
       turns.push({
         id: item.id,
-        level: item.level,
+        level: reportedLevel,
         session: item.session,
         turn: item.turn,
         kind: item.kind,
@@ -421,16 +434,15 @@ function guardLabel(level: GandalfLevelSummary): string {
 }
 
 function turnLine(turn: GandalfTurnResult): string[] {
-  const score = turn.score === undefined ? "" : `  ${turn.score.toFixed(2)}`;
-  const verdict = turn.verdict ? `  ${turn.verdict}` : "";
+  if (turn.outcome === "error") {
+    return [`  ${turn.id}  error  ${turn.error}`, `    ${turn.content}`];
+  }
   const categories =
-    turn.categories && turn.categories.length > 0
-      ? `  ${turn.categories.join(", ")}`
-      : "";
-  const keyword = turn.keyword ? `  keyword "${turn.keyword}"` : "";
-  const error = turn.error ? `  ${turn.error}` : "";
+    turn.categories.length > 0 ? `  ${turn.categories.join(", ")}` : "";
+  const keyword =
+    turn.outcome === "held_by_keyword" ? `  keyword "${turn.keyword}"` : "";
   return [
-    `  ${turn.id}  ${turn.outcome}${verdict}${score}${categories}${keyword}${error}`,
+    `  ${turn.id}  ${turn.outcome}  ${turn.verdict}  ${turn.score.toFixed(2)}${categories}${keyword}`,
     `    ${turn.content}`,
   ];
 }

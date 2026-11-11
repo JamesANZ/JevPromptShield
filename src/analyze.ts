@@ -16,6 +16,7 @@ import {
   type MediaTranscriber,
 } from "./media/transcribe.js";
 import { compareDocuments, type CompareOptions } from "./compare.js";
+import { resolveModality } from "./modality.js";
 import type {
   AnalyzeRequest,
   AnalyzeResult,
@@ -90,21 +91,35 @@ async function submittedContent(
   request: AnalyzeRequest,
   options?: AnalyzeOptions,
 ): Promise<{ content: string; transcript?: string }> {
-  const hasImage = request.image !== undefined;
-  const hasAudio = request.audio !== undefined;
-  const hasContent = request.content !== undefined;
-  if (Number(hasImage) + Number(hasAudio) + Number(hasContent) > 1) {
-    throw new ShieldError(
-      "invalid_request",
+  let modality;
+  try {
+    modality = resolveModality(
+      request,
       "Pass content, image, or audio, not more than one.",
     );
+  } catch (error) {
+    if (
+      isShieldError(error) &&
+      request.content === undefined &&
+      request.image === undefined &&
+      request.audio === undefined
+    ) {
+      return { content: "" };
+    }
+    throw error;
   }
-  if (!hasImage && !hasAudio) return { content: request.content ?? "" };
-
-  const kind = hasImage ? "image" : "audio";
-  const attachment = hasImage ? request.image : request.audio;
-  if (!attachment) return { content: request.content ?? "" };
-  const prepared = prepareMedia(kind, attachment);
+  if (modality.modality === "text") {
+    return { content: typeof modality.value === "string" ? modality.value : "" };
+  }
+  const kind = modality.modality;
+  const attachment = modality.value;
+  if (attachment === null || typeof attachment !== "object") {
+    throw new ShieldError(
+      "invalid_request",
+      `${kind} must be an object with media_type and data.`,
+    );
+  }
+  const prepared = prepareMedia(kind, attachment as NonNullable<AnalyzeRequest["image"]>);
   const transcriber = options?.transcriber ?? createOpenAiMediaTranscriber();
   let raw: string;
   try {

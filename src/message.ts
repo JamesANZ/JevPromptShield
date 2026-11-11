@@ -11,17 +11,16 @@ import type {
   AnalyzeResult,
   Category,
   MessagePart,
-  Risk,
+  Source,
   Verdict,
 } from "./types.js";
+import { SOURCES } from "./types.js";
 
 const SEVERITY: Record<Verdict, number> = {
   safe: 0,
   suspicious: 1,
   malicious: 2,
 };
-
-const RISK_SEVERITY: Record<Risk, number> = { low: 0, medium: 1, high: 2 };
 
 function requestForPart(
   part: MessagePart,
@@ -40,19 +39,54 @@ function requestForPart(
   return { ...common, audio: part.audio };
 }
 
-function validatePart(part: MessagePart, index: number): void {
+function attachment(value: unknown, index: number, kind: "image" | "audio") {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new ShieldError(
+      "invalid_request",
+      `Message part ${index + 1} ${kind} must be an object.`,
+    );
+  }
+  return value as { media_type: string; data: string | Uint8Array };
+}
+
+/** The part tag and its payload are one state. A text tag cannot carry an image. */
+function parsePart(part: unknown, index: number): MessagePart {
   if (part === null || typeof part !== "object" || Array.isArray(part)) {
     throw new ShieldError(
       "invalid_request",
       `Message part ${index + 1} must be an object.`,
     );
   }
-  if (part.type !== "text" && part.type !== "image" && part.type !== "audio") {
-    throw new ShieldError(
-      "invalid_request",
-      `Message part ${index + 1} must have type text, image, or audio.`,
-    );
+  const body = part as Record<string, unknown>;
+  let source: { source?: Source } = {};
+  if (body.source !== undefined) {
+    if (typeof body.source !== "string" || !SOURCES.includes(body.source as Source)) {
+      throw new ShieldError(
+        "invalid_request",
+        `Message part ${index + 1} source must be one of: ${SOURCES.join(", ")}.`,
+      );
+    }
+    source = { source: body.source as Source };
   }
+  if (body.type === "text") {
+    if (typeof body.content !== "string") {
+      throw new ShieldError(
+        "invalid_request",
+        `Message part ${index + 1} content must be a string.`,
+      );
+    }
+    return { ...source, type: "text", content: body.content };
+  }
+  if (body.type === "image") {
+    return { ...source, type: "image", image: attachment(body.image, index, "image") };
+  }
+  if (body.type === "audio") {
+    return { ...source, type: "audio", audio: attachment(body.audio, index, "audio") };
+  }
+  throw new ShieldError(
+    "invalid_request",
+    `Message part ${index + 1} must have type text, image, or audio.`,
+  );
 }
 
 export async function analyzeMessage(
@@ -71,11 +105,11 @@ export async function analyzeMessage(
       `A message can contain at most ${MAX_MESSAGE_PARTS} parts.`,
     );
   }
-  request.parts.forEach(validatePart);
+  const parsed = request.parts.map((part, index) => parsePart(part, index));
 
   const started = performance.now();
   const parts: AnalyzeMessageResult["parts"] = [];
-  for (const [index, part] of request.parts.entries()) {
+  for (const [index, part] of parsed.entries()) {
     const result = await analyze(requestForPart(part, request), options);
     parts.push({
       index,
@@ -86,15 +120,14 @@ export async function analyzeMessage(
   }
 
   const results = parts.map((part) => part.result);
-  const highest = results.reduce((current, result) =>
-    SEVERITY[result.verdict] > SEVERITY[current.verdict] ? result : current,
-  );
-  const risk = results.reduce<Risk>(
-    (current, result) =>
-      RISK_SEVERITY[result.risk] > RISK_SEVERITY[current] ? result.risk : current,
-    "low",
-  );
-  const flagged = parts.filter((part) => !part.result.safe);
+  const winner = results.reduce((current, result) => {
+    const verdictRank = SEVERITY[result.verdict] - SEVERITY[current.verdict];
+    if (verdictRank > 0 || (verdictRank === 0 && result.score > current.score)) {
+      return result;
+    }
+    return current;
+  });
+  const flagged = parts.filter((part) => part.result.verdict !== "safe");
   const categories = [
     ...new Set<Category>(results.flatMap((result) => result.categories)),
   ];
@@ -105,10 +138,10 @@ export async function analyzeMessage(
       : `Unsafe content detected in message part${flagged.length === 1 ? "" : "s"} ${flagged.map((part) => part.index + 1).join(", ")}.`;
 
   return {
-    safe: flagged.length === 0,
-    verdict: highest.verdict,
-    risk,
-    score: Math.max(...results.map((result) => result.score)),
+    safe: winner.safe,
+    verdict: winner.verdict,
+    risk: winner.risk,
+    score: winner.score,
     categories,
     reason,
     parts,

@@ -113,6 +113,23 @@ describe("analyzeMessage", () => {
     );
   });
 
+  it("rejects a part whose tag does not match its payload", async () => {
+    await assert.rejects(
+      () =>
+        analyzeMessage({
+          parts: [{ type: "text", image: { media_type: "image/png", data: "xx" } } as never],
+        }),
+      /content must be a string/,
+    );
+    await assert.rejects(
+      () =>
+        analyzeMessage({
+          parts: [{ type: "image", content: "hello" } as never],
+        }),
+      /image must be an object/,
+    );
+  });
+
   it("rejects empty and invalid part lists before provider calls", async () => {
     await assert.rejects(
       () => analyzeMessage({ parts: [] }),

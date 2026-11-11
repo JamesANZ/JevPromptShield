@@ -50,13 +50,38 @@ export interface ActionClient {
   judge(state: ActionState): Promise<ActionJudgement>;
 }
 
-export interface ActionDecision {
-  decision: Decision;
-  decider: Decider;
+interface ActionDecisionBase {
   reason: string;
-  jevCalled: boolean;
   command: string;
   latency_ms: number;
-  model?: string;
-  confidence?: number;
 }
+
+/**
+ * Who decided, and whether Jev was called, are one state.
+ * Local decisions are ALLOW or BLOCK and never call Jev.
+ * A fallback never ALLOWs. A Jev decision always records model and confidence.
+ */
+export type ActionDecision = ActionDecisionBase &
+  (
+    | {
+        decision: "ALLOW" | "BLOCK";
+        decider: "local";
+        jevCalled: false;
+        model?: undefined;
+        confidence?: undefined;
+      }
+    | {
+        decision: Decision;
+        decider: "jev";
+        jevCalled: true;
+        model: string;
+        confidence: number;
+      }
+    | {
+        decision: "ASK" | "BLOCK";
+        decider: "fallback";
+        jevCalled: true;
+        model?: undefined;
+        confidence?: undefined;
+      }
+  );

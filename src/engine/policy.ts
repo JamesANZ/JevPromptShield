@@ -5,7 +5,6 @@ import type {
   AnalyzeResult,
   Category,
   ContentRole,
-  Risk,
   Signal,
   Thresholds,
   Verdict,
@@ -55,6 +54,20 @@ export function buildReason(verdict: Verdict, categories: Category[]): string {
   return `Content attempts to ${joinAnd(phrases)}.`;
 }
 
+/** Verdict, risk, and safe are one state. They are not chosen independently. */
+export function severityFromScore(
+  score: number,
+  thresholds: Thresholds,
+): { safe: true; verdict: "safe"; risk: "low" } | { safe: false; verdict: "suspicious"; risk: "medium" } | { safe: false; verdict: "malicious"; risk: "high" } {
+  if (score >= thresholds.malicious) {
+    return { safe: false, verdict: "malicious", risk: "high" };
+  }
+  if (score >= thresholds.suspicious) {
+    return { safe: false, verdict: "suspicious", risk: "medium" };
+  }
+  return { safe: true, verdict: "safe", risk: "low" };
+}
+
 function assertScore(name: string, value: number): void {
   if (!Number.isFinite(value) || value < 0 || value > 1) {
     throw new ShieldError(
@@ -78,19 +91,11 @@ export function applyPolicy(
   assertScore(SOURCE_BLIND_SIGNAL, decision.scores[SOURCE_BLIND_SIGNAL]);
 
   // A specific attack must not hide behind a low general injection score.
-  const score = Math.max(...CATEGORIES.map((category) => decision.scores[category]));
-  let verdict: Verdict;
-  let risk: Risk;
-  if (score >= thresholds.malicious) {
-    verdict = "malicious";
-    risk = "high";
-  } else if (score >= thresholds.suspicious) {
-    verdict = "suspicious";
-    risk = "medium";
-  } else {
-    verdict = "safe";
-    risk = "low";
-  }
+  const score = Math.max(
+    ...CATEGORIES.map((category) => decision.scores[category]),
+  );
+  const severity = severityFromScore(score, thresholds);
+  const { verdict } = severity;
 
   const signals: Record<string, Signal> = {};
   for (const category of CATEGORIES) {
@@ -118,9 +123,9 @@ export function applyPolicy(
       : CATEGORIES.filter((category) => signals[category]?.triggered === true);
 
   return {
-    safe: verdict === "safe",
-    verdict,
-    risk,
+    safe: severity.safe,
+    verdict: severity.verdict,
+    risk: severity.risk,
     score,
     categories: [...categories],
     reason: buildReason(verdict, categories),

@@ -1,4 +1,5 @@
 import { ShieldError } from "../errors.js";
+import { resolveModality } from "../modality.js";
 import { prepareMedia, type MediaKind } from "../media/transcribe.js";
 import type {
   AnalyzeRequest,
@@ -21,19 +22,9 @@ export function parseAnalyzeBody(raw: unknown, bytes?: number): AnalyzeRequest {
     );
   }
   const body = raw as Record<string, unknown>;
-  const hasContent = body.content !== undefined;
-  const hasImage = body.image !== undefined;
-  const hasAudio = body.audio !== undefined;
-  const attachments = Number(hasContent) + Number(hasImage) + Number(hasAudio);
-  if (attachments > 1) {
-    throw new ShieldError(
-      "invalid_request",
-      "Pass content, image, or audio, not more than one.",
-    );
-  }
   if (
-    !hasImage &&
-    !hasAudio &&
+    body.image === undefined &&
+    body.audio === undefined &&
     bytes !== undefined &&
     bytes > MAX_TEXT_BODY_BYTES
   ) {
@@ -42,18 +33,24 @@ export function parseAnalyzeBody(raw: unknown, bytes?: number): AnalyzeRequest {
       "Request body is too large. Shield does not truncate.",
     );
   }
+  const modality = resolveModality(
+    body,
+    body.content === undefined &&
+      body.image === undefined &&
+      body.audio === undefined
+      ? "content must be a string."
+      : "Pass content, image, or audio, not more than one.",
+  );
   const request: AnalyzeRequest = {};
-  if (hasContent) {
-    if (typeof body.content !== "string") {
+  if (modality.modality === "text") {
+    if (typeof modality.value !== "string") {
       throw new ShieldError("invalid_request", "content must be a string.");
     }
-    request.content = body.content;
-  } else if (hasImage) {
-    request.image = parseAttachment("image", body.image);
-  } else if (hasAudio) {
-    request.audio = parseAttachment("audio", body.audio);
+    request.content = modality.value;
+  } else if (modality.modality === "image") {
+    request.image = parseAttachment("image", modality.value);
   } else {
-    throw new ShieldError("invalid_request", "content must be a string.");
+    request.audio = parseAttachment("audio", modality.value);
   }
   if (body.source !== undefined) {
     if (
@@ -215,15 +212,10 @@ function parseCompareDocument(raw: unknown): CompareDocument {
     );
   }
   const body = raw as Record<string, unknown>;
-  const hasContent = body.content !== undefined;
-  const hasImage = body.image !== undefined;
-  const hasAudio = body.audio !== undefined;
-  if (Number(hasContent) + Number(hasImage) + Number(hasAudio) !== 1) {
-    throw new ShieldError(
-      "invalid_request",
-      "Each document must include content, image, or audio, and only one of them.",
-    );
-  }
+  const modality = resolveModality(
+    body,
+    "Each document must include content, image, or audio, and only one of them.",
+  );
   const document: CompareDocument = {};
   if (body.id !== undefined) {
     if (typeof body.id !== "string") {
@@ -240,18 +232,18 @@ function parseCompareDocument(raw: unknown): CompareDocument {
     }
     document.name = body.name;
   }
-  if (hasContent) {
-    if (typeof body.content !== "string") {
+  if (modality.modality === "text") {
+    if (typeof modality.value !== "string") {
       throw new ShieldError(
         "invalid_request",
         "document content must be a string.",
       );
     }
-    document.content = body.content;
-  } else if (hasImage) {
-    document.image = parseAttachment("image", body.image);
+    document.content = modality.value;
+  } else if (modality.modality === "image") {
+    document.image = parseAttachment("image", modality.value);
   } else {
-    document.audio = parseAttachment("audio", body.audio);
+    document.audio = parseAttachment("audio", modality.value);
   }
   return document;
 }

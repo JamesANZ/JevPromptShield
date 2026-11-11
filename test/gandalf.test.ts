@@ -106,7 +106,6 @@ describe("gandalf pre-check", () => {
         },
         {
           id: "gandalf-benign-1",
-          level: null,
           session: "benign",
           turn: 1,
           kind: "benign",

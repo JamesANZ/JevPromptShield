@@ -78,6 +78,33 @@ describe("classify", () => {
     assert.equal(classifyCommand("git status").outcome, "allow");
   });
 
+  it("allows a read-only command whose argument only mentions a destructive command", () => {
+    for (const command of [
+      'echo "rm -rf /"',
+      'echo "git push --force origin main"',
+      'echo "mkfs.ext4 /dev/sdb"',
+      'printf %s "dd if=/dev/zero of=/dev/sda"',
+      "git status # && rm -rf /",
+    ]) {
+      assert.equal(classifyCommand(command).outcome, "allow", command);
+    }
+  });
+
+  it("still blocks a destructive command that would actually run", () => {
+    for (const command of [
+      'bash -c "rm -rf /"',
+      "sh -c 'rm -rf /'",
+      'bash -lc "rm -rf /"',
+      "rm -rf / # comment",
+      "git status # note\nrm -rf /",
+      "FOO=1 rm -rf /",
+    ]) {
+      assert.equal(classifyCommand(command).outcome, "block", command);
+    }
+    assert.equal(classifyCommand("rm -- -rf /").outcome, "review");
+    assert.equal(classifyCommand("echo $(rm -rf /)").outcome, "review");
+  });
+
   it("blocks a force-push with no refspec when the current branch is main", () => {
     assert.equal(
       classifyCommand("git push --force origin", { gitBranch: "main" }).outcome,

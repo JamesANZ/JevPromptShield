@@ -9,6 +9,24 @@ describe("scan", () => {
     assert.deepEqual(quoted.argv, ["echo", "hello && world"]);
   });
 
+  it("keeps an escaped space inside one word and a hash inside quotes", () => {
+    assert.deepEqual(scanCommand("echo hello\\ world").argv, [
+      "echo",
+      "hello world",
+    ]);
+    assert.deepEqual(scanCommand('echo "foo # bar"').argv, ["echo", "foo # bar"]);
+    assert.deepEqual(scanCommand("echo foo#bar").argv, ["echo", "foo#bar"]);
+  });
+
+  it("treats a hash that starts a word as a comment, and a following line as another command", () => {
+    const commented = scanCommand("git status # && rm -rf /");
+    assert.equal(commented.simple, true);
+    assert.deepEqual(commented.argv, ["git", "status"]);
+    assert.equal(scanCommand("ls # note\nrm").simple, false);
+    assert.equal(scanCommand('echo "unterminated').simple, false);
+    assert.equal(scanCommand("echo trailing\\").simple, false);
+  });
+
   it("rejects compound commands, substitutions, and redirects", () => {
     for (const command of [
       "git status && rm -rf /tmp/app",

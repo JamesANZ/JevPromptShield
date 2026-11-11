@@ -27,12 +27,16 @@ export function selectSplit(
   return cases.filter((item) => splitForId(item.id) === split);
 }
 
-export async function scoreCorpus(input: {
-  cases: CorpusCase[];
-  client?: JevClient;
-  fixtures?: Map<string, JevDecision>;
-  thresholds?: { suspicious: number; malicious: number };
-}): Promise<{ rows: ScoredCase[]; errors: string[] }> {
+export type CorpusScoreSource =
+  | { mode: "fixture"; fixtures: Map<string, JevDecision> }
+  | { mode: "live"; client: JevClient };
+
+export async function scoreCorpus(
+  input: {
+    cases: CorpusCase[];
+    thresholds?: { suspicious: number; malicious: number };
+  } & CorpusScoreSource,
+): Promise<{ rows: ScoredCase[]; errors: string[] }> {
   const thresholds = input.thresholds ?? resolveThresholds();
   const rows: ScoredCase[] = [];
   const errors: string[] = [];
@@ -47,18 +51,16 @@ export async function scoreCorpus(input: {
       let result;
       let latency: number | null;
       let tokens: number | null;
-      if (input.fixtures) {
+      if (input.mode === "fixture") {
         const decision = input.fixtures.get(item.id);
         if (!decision) throw new Error(`missing fixture for ${item.id}`);
         result = resultFromDecision(decision, thresholds, 0);
         latency = null;
         tokens = null;
-      } else if (input.client) {
+      } else {
         result = await analyze(request, { client: input.client });
         latency = result.latency_ms;
         tokens = result.usage.input_tokens;
-      } else {
-        throw new Error("scoreCorpus needs a client or fixtures.");
       }
       const triggered = CATEGORIES.filter(
         (category) => result.signals[category]?.triggered === true,
@@ -85,22 +87,20 @@ export async function scoreCorpus(input: {
   return { rows, errors };
 }
 
-export async function evaluateCorpus(input: {
-  cases: CorpusCase[];
-  mode: "live" | "fixture";
-  split: "dev" | "test" | "all";
-  client?: JevClient;
-  fixtures?: Map<string, JevDecision>;
-  thresholds?: { suspicious: number; malicious: number };
-}): Promise<EvalReport> {
+export async function evaluateCorpus(
+  input: {
+    cases: CorpusCase[];
+    split: "dev" | "test" | "all";
+    thresholds?: { suspicious: number; malicious: number };
+  } & CorpusScoreSource,
+): Promise<EvalReport> {
   const selected = selectSplit(input.cases, input.split);
   const thresholds = input.thresholds ?? resolveThresholds();
-  const scored = await scoreCorpus({
-    cases: selected,
-    thresholds,
-    ...(input.client ? { client: input.client } : {}),
-    ...(input.fixtures ? { fixtures: input.fixtures } : {}),
-  });
+  const scored = await scoreCorpus(
+    input.mode === "fixture"
+      ? { cases: selected, thresholds, mode: "fixture", fixtures: input.fixtures }
+      : { cases: selected, thresholds, mode: "live", client: input.client },
+  );
   return buildEvalReport({
     mode: input.mode,
     rows: scored.rows,

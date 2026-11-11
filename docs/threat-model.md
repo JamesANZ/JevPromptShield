@@ -26,7 +26,7 @@ The agent is untrusted as an enforcement mechanism. Its tool call is a proposal.
 
 ### How a decision is made
 
-The hook parses stdin into a command, working directory, and agent name. It does not read a pre-baked allow from that JSON. Local policy runs first. A command is a local ALLOW only when a quote-aware scan proves it is one simple command and the executable is on the read-only list. `git status && rm -rf /tmp/app` is not that. Catastrophic patterns block even inside a compound command.
+The hook parses stdin into a command, working directory, and agent name. It does not read a pre-baked allow from that JSON. Local policy runs first. A command is a local ALLOW only when a quote-aware scan proves it is one simple command and the executable is on the read-only list. `git status && rm -rf /tmp/app` is not that. A `#` comment ends that simple command; a newline after the comment is a second command and is not allowed locally. Catastrophic patterns block when they are the command being run, including inside a compound command and inside `bash -c "..."`. They do not block a simple read-only command whose argument merely contains that text, such as `echo "rm -rf /"`.
 
 If the local policy does not decide, Shield sends Jev the redacted command, cwd, git branch name, environment class, tool name, and a capped description. It does not send the process environment, file contents, or the transcript. Jev answers a disposition choice (`allow`, `ask`, `block`) and an irreversible-harm probability. Confidence below 0.7 becomes ASK. Irreversible harm at or above 0.75 becomes BLOCK. The action question set is version `2026-10-08.1`.
 

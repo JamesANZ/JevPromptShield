@@ -370,13 +370,14 @@ gandalf scores the published Gandalf solutions with Shield before a defender cal
   }
 
   if (command === "analyze") {
-    const inputs = [
-      values.content,
-      values.file,
-      values.image,
-      values.audio,
-    ].filter((value) => value !== undefined);
-    if (inputs.length !== 1) {
+    const selected = [
+      values.content !== undefined ? ("content" as const) : undefined,
+      values.file !== undefined ? ("file" as const) : undefined,
+      values.image !== undefined ? ("image" as const) : undefined,
+      values.audio !== undefined ? ("audio" as const) : undefined,
+    ].filter((item) => item !== undefined);
+    const input = selected[0];
+    if (selected.length !== 1 || input === undefined) {
       fail("Pass one of --content, --file, --image, or --audio.");
     }
     if (!values.source || !SOURCES.includes(values.source as Source)) {
@@ -388,31 +389,37 @@ gandalf scores the published Gandalf solutions with Shield before a defender cal
     const context = values.context ? { context: values.context } : {};
     try {
       const { readFile } = await import("node:fs/promises");
-      const result = values.image
-        ? await analyze({
-            image: {
-              media_type: mediaTypeForFilename(values.image, "image"),
-              data: await readFile(values.image),
-            },
-            source,
-            ...context,
-          })
-        : values.audio
-          ? await analyze({
-              audio: {
-                media_type: mediaTypeForFilename(values.audio, "audio"),
-                data: await readFile(values.audio),
+      const request =
+        input === "image"
+          ? {
+              image: {
+                media_type: mediaTypeForFilename(values.image ?? "", "image"),
+                data: await readFile(values.image ?? ""),
               },
               source,
               ...context,
-            })
-          : await analyze({
-              content: values.file
-                ? await readFile(values.file, "utf8")
-                : values.content,
-              source,
-              ...context,
-            });
+            }
+          : input === "audio"
+            ? {
+                audio: {
+                  media_type: mediaTypeForFilename(values.audio ?? "", "audio"),
+                  data: await readFile(values.audio ?? ""),
+                },
+                source,
+                ...context,
+              }
+            : input === "file"
+              ? {
+                  content: await readFile(values.file ?? "", "utf8"),
+                  source,
+                  ...context,
+                }
+              : {
+                  content: values.content,
+                  source,
+                  ...context,
+                };
+      const result = await analyze(request);
       printResult(result);
     } catch (error) {
       if (isShieldError(error))
@@ -484,7 +491,6 @@ gandalf scores the published Gandalf solutions with Shield before a defender cal
     const report = await runGandalfPrecheck({
       turns,
       mode: "live",
-      client: createLiveJevClient(),
     });
     const outDir = values.out ?? resolve(root, "eval/results");
     await mkdir(outDir, { recursive: true });
@@ -513,14 +519,19 @@ gandalf scores the published Gandalf solutions with Shield before a defender cal
       );
     }
     const mode = fixturePath ? "fixture" : "live";
-    const report = await evaluateCorpus({
-      cases,
-      mode,
-      split,
-      ...(fixturePath
-        ? { fixtures: await loadFixtures(fixturePath) }
-        : { client: createLiveJevClient() }),
-    });
+    const report = fixturePath
+      ? await evaluateCorpus({
+          cases,
+          mode: "fixture",
+          split,
+          fixtures: await loadFixtures(fixturePath),
+        })
+      : await evaluateCorpus({
+          cases,
+          mode: "live",
+          split,
+          client: createLiveJevClient(),
+        });
     const output: {
       shield: typeof report;
       baseline?: unknown;

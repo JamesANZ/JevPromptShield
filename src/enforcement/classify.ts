@@ -21,6 +21,7 @@ const VERSION_BINS = new Set([
   "python3",
 ]);
 const BARE_READ_ONLY = new Set(["pwd", "whoami", "date", "hostname"]);
+const SHELLS = new Set(["bash", "sh", "zsh", "dash", "ksh", "fish"]);
 
 function executable(argv0: string): string {
   return basename(argv0);
@@ -98,39 +99,50 @@ function isRootTarget(target: string): boolean {
   );
 }
 
+type RmFlags = { recursive: boolean; force: boolean };
+
+/**
+ * `rm` option parsing. `--` is a one-way transition from options to operands.
+ * Recursive and force stay flags; they are not a second mode.
+ */
+type RmParse =
+  | { phase: "options"; flags: RmFlags; targets: string[] }
+  | { phase: "operands"; flags: RmFlags; targets: string[] };
+
+function rmFlags(flags: RmFlags, arg: string): RmFlags {
+  if (arg === "--recursive") return { ...flags, recursive: true };
+  if (arg === "--force") return { ...flags, force: true };
+  if (arg.startsWith("--")) return flags;
+  if (arg.startsWith("-")) {
+    const letters = arg.slice(1);
+    return {
+      recursive: flags.recursive || letters.includes("r") || letters.includes("R"),
+      force: flags.force || letters.includes("f"),
+    };
+  }
+  return flags;
+}
+
+function stepRm(state: RmParse, arg: string): RmParse {
+  if (state.phase === "operands") {
+    return { ...state, targets: [...state.targets, arg] };
+  }
+  if (arg === "--") return { phase: "operands", flags: state.flags, targets: state.targets };
+  if (arg.startsWith("-")) {
+    return { ...state, flags: rmFlags(state.flags, arg) };
+  }
+  return { ...state, targets: [...state.targets, arg] };
+}
+
 function rmArgvWipesRoot(argv: string[]): boolean {
   if (executable(argv[0] ?? "") !== "rm") return false;
-  let recursive = false;
-  let force = false;
-  let afterDash = false;
-  const targets: string[] = [];
-  for (const arg of argv.slice(1)) {
-    if (afterDash) {
-      targets.push(arg);
-      continue;
-    }
-    if (arg === "--") {
-      afterDash = true;
-      continue;
-    }
-    if (arg === "--recursive") {
-      recursive = true;
-      continue;
-    }
-    if (arg === "--force") {
-      force = true;
-      continue;
-    }
-    if (arg.startsWith("--")) continue;
-    if (arg.startsWith("-")) {
-      const letters = arg.slice(1);
-      if (letters.includes("r") || letters.includes("R")) recursive = true;
-      if (letters.includes("f")) force = true;
-      continue;
-    }
-    targets.push(arg);
-  }
-  return recursive && force && targets.some(isRootTarget);
+  let state: RmParse = {
+    phase: "options",
+    flags: { recursive: false, force: false },
+    targets: [],
+  };
+  for (const arg of argv.slice(1)) state = stepRm(state, arg);
+  return state.flags.recursive && state.flags.force && state.targets.some(isRootTarget);
 }
 
 function rawRootWipe(command: string): boolean {
@@ -211,6 +223,23 @@ function forcePushToProtected(
 }
 
 /**
+ * A shell `-c` argument is another command, not opaque data.
+ * `bash -c "rm -rf /"` is the wipe. `echo "rm -rf /"` is not.
+ */
+function shellScript(argv: string[]): string | undefined {
+  if (!SHELLS.has(executable(argv[0] ?? ""))) return undefined;
+  for (let index = 1; index < argv.length; index += 1) {
+    const arg = argv[index] ?? "";
+    if (arg === "--") return undefined;
+    if (arg === "-c" || arg === "--command") return argv[index + 1];
+    if (arg.startsWith("-") && !arg.startsWith("--") && arg.includes("c")) {
+      return argv[index + 1];
+    }
+  }
+  return undefined;
+}
+
+/**
  * Local policy for commands whose shape is enough.
  * `review` means the caller should ask Jev. Remote-script pipes stay in
  * `review` because the URL and the shell on the right-hand side need a judgement.
@@ -223,33 +252,48 @@ export function classifyCommand(
     findInjectionTrick(command) ??
     (hints?.description ? findInjectionTrick(hints.description) : undefined);
   if (trick) return { outcome: "block", reason: trick };
-  if (isForkBomb(command)) {
-    return { outcome: "block", reason: "Fork bomb blocked before execution." };
+
+  const scanned = scanCommand(command);
+  if (scanned.simple) {
+    const script = shellScript(scanned.argv);
+    if (script !== undefined) {
+      const nested = classifyCommand(script, hints);
+      if (nested.outcome === "block") return nested;
+    }
   }
-  if (writesRawDisk(command)) {
-    return {
-      outcome: "block",
-      reason: "Raw disk write blocked before execution.",
-    };
-  }
-  if (formatsFilesystem(command)) {
-    return {
-      outcome: "block",
-      reason: "Filesystem format command blocked before execution.",
-    };
-  }
-  if (wipesRoot(command)) {
-    return {
-      outcome: "block",
-      reason:
-        "Recursive delete of a root or home directory blocked before execution.",
-    };
-  }
-  if (forcePushToProtected(command, hints?.gitBranch)) {
-    return {
-      outcome: "block",
-      reason: "Force-push to a protected branch blocked before execution.",
-    };
+  const quotedReadOnly = scanned.simple && isReadOnly(scanned.argv);
+  // The scan proved one simple read-only command. A catastrophic string in an
+  // argument is data. The same string still blocks when it is the command,
+  // including inside `bash -c`, or when shell syntax makes the scan fail.
+  if (!quotedReadOnly) {
+    if (isForkBomb(command)) {
+      return { outcome: "block", reason: "Fork bomb blocked before execution." };
+    }
+    if (writesRawDisk(command)) {
+      return {
+        outcome: "block",
+        reason: "Raw disk write blocked before execution.",
+      };
+    }
+    if (formatsFilesystem(command)) {
+      return {
+        outcome: "block",
+        reason: "Filesystem format command blocked before execution.",
+      };
+    }
+    if (wipesRoot(command)) {
+      return {
+        outcome: "block",
+        reason:
+          "Recursive delete of a root or home directory blocked before execution.",
+      };
+    }
+    if (forcePushToProtected(command, hints?.gitBranch)) {
+      return {
+        outcome: "block",
+        reason: "Force-push to a protected branch blocked before execution.",
+      };
+    }
   }
   if (command.length > MAX_COMMAND_CHARS) {
     return {
@@ -259,7 +303,6 @@ export function classifyCommand(
     };
   }
 
-  const scanned = scanCommand(command);
   if (!scanned.simple) {
     return {
       outcome: "review",

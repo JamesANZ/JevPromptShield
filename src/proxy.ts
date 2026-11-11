@@ -213,6 +213,13 @@ function conversationContext(
   return context === "" ? undefined : context;
 }
 
+/** Only end-user and tool turns are scanned. Other roles are trusted or absent. */
+function scannedSource(role: unknown): Source | undefined {
+  if (role === "user") return "user";
+  if (role === "tool") return "tool";
+  return undefined;
+}
+
 function parseChatRequest(raw: unknown): ChatRequest {
   const body = object(raw, "Request body") as ChatRequest;
   if (!Array.isArray(body.messages) || body.messages.length === 0) {
@@ -238,8 +245,8 @@ export async function guardChatCompletion(
   const configuredContext = options.env?.JEV_SHIELD_PROXY_CONTEXT;
   await withDeadline(timeoutMs, async () => {
     for (const [index, message] of body.messages.entries()) {
-      if (message.role !== "user" && message.role !== "tool") continue;
-      const source: Source = message.role === "user" ? "user" : "tool";
+      const source = scannedSource(message.role);
+      if (source === undefined) continue;
       const parts = contentParts(message.content, `messages[${index}]`);
       if (parts.length === 0) continue;
       const context = conversationContext(

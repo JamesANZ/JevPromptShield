@@ -16,8 +16,6 @@ import type {
   ActionContext,
   ActionDecision,
   ActionState,
-  Decider,
-  Decision,
 } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -57,7 +55,10 @@ export interface EvaluateOptions {
   createClient?: (config: EnforcementConfig) => ActionClient;
 }
 
-function fallback(failMode: FailMode): { decision: Decision; reason: string } {
+function fallback(failMode: FailMode): {
+  decision: "ASK" | "BLOCK";
+  reason: string;
+} {
   if (failMode === "block") {
     return {
       decision: "BLOCK",
@@ -116,25 +117,7 @@ export async function evaluateAction(
     ...(enriched.description ? { description: enriched.description } : {}),
   });
 
-  const finish = async (
-    decision: Decision,
-    decider: Decider,
-    reason: string,
-    jevCalled: boolean,
-    extra?: { model?: string; confidence?: number },
-  ): Promise<ActionDecision> => {
-    const result: ActionDecision = {
-      decision,
-      decider,
-      reason,
-      jevCalled,
-      command: redactedCommand,
-      latency_ms: performance.now() - started,
-      ...(extra?.model ? { model: extra.model } : {}),
-      ...(extra?.confidence !== undefined
-        ? { confidence: extra.confidence }
-        : {}),
-    };
+  const record = async (result: ActionDecision): Promise<ActionDecision> => {
     try {
       await appendAudit(
         config.auditPath,
@@ -152,13 +135,17 @@ export async function evaluateAction(
     return result;
   };
 
+  const elapsed = () => performance.now() - started;
+
   if (local.outcome === "allow" || local.outcome === "block") {
-    return finish(
-      local.outcome === "allow" ? "ALLOW" : "BLOCK",
-      "local",
-      local.reason,
-      false,
-    );
+    return record({
+      decision: local.outcome === "allow" ? "ALLOW" : "BLOCK",
+      decider: "local",
+      reason: local.reason,
+      jevCalled: false,
+      command: redactedCommand,
+      latency_ms: elapsed(),
+    });
   }
 
   const state = toState(enriched, redactedCommand, enriched.gitBranch);
@@ -170,12 +157,25 @@ export async function evaluateAction(
         : createActionClient({ timeoutMs: config.jevTimeoutMs }));
     const judgement = await client.judge(state);
     const choice = decisionFromJudgement(judgement);
-    return finish(choice.decision, "jev", choice.reason, true, {
+    return record({
+      decision: choice.decision,
+      decider: "jev",
+      reason: choice.reason,
+      jevCalled: true,
+      command: redactedCommand,
+      latency_ms: elapsed(),
       model: judgement.model,
       confidence: judgement.confidence,
     });
   } catch {
     const failed = fallback(config.failMode);
-    return finish(failed.decision, "fallback", failed.reason, true);
+    return record({
+      decision: failed.decision,
+      decider: "fallback",
+      reason: failed.reason,
+      jevCalled: true,
+      command: redactedCommand,
+      latency_ms: elapsed(),
+    });
   }
 }
